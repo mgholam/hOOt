@@ -1,0 +1,8 @@
+v1.0
+-----
+- initial release
+
+v1.1
+----
+- tweaked parameters and reduced index size by 30%
+- bug fix sample ui 
