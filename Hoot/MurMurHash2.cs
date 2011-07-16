@@ -246,7 +246,7 @@ namespace hOOt
         #endregion
     }
 
-    public class MurmurHash2Unsafe
+    internal class MurmurHash2Unsafe
     {
         public UInt32 Hash(Byte[] data)
         {

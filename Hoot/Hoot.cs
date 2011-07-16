@@ -4,12 +4,13 @@ using System.Text;
 using System.Collections;
 using System.IO;
 using System.Xml.Serialization;
+using System.Threading;
 
 namespace hOOt
 {
     public class Hoot
     {
-        
+
         public Hoot(string IndexPath, string FileName)
         {
             _Path = IndexPath;
@@ -23,7 +24,7 @@ namespace hOOt
 
             _docs = new StorageFile(_Path + _FileName + ".docs", 4);
             // read hash index file
-            _hash = new Hash(_Path + _FileName + ".idx", 255, 10, false, 1009);//5003);
+            _hash = new Hash(_Path + _FileName + ".idx", 255, 10, false, 1009);
             _hash.InMemory = true;
             // read doc count
             _lastDocNum = (int)_hash.Count();
@@ -31,6 +32,9 @@ namespace hOOt
             LoadWords();
             // read deleted
             ReadDeleted();
+            // open bitmap index
+            _bitmapFile = new FileStream(_Path + _FileName + ".bitmap", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+            _lastBitmapOffset = _bitmapFile.Seek(0L, SeekOrigin.End);
         }
 
         private ILog _log = LogManager.GetLogger(typeof(Hoot));
@@ -39,8 +43,12 @@ namespace hOOt
         private string _FileName = "words";
         private string _Path = "";
         private Dictionary<string, Cache> _index = new Dictionary<string, Cache>(100000);
-        private WAHBitArray _deleted = new WAHBitArray(1);
+        private WAHBitArray _deleted = new WAHBitArray();
         private StorageFile _docs;
+        private bool _internalOP = false;
+        private object _lock = new object();
+        private FileStream _bitmapFile;
+        private long _lastBitmapOffset = 0;
 
         public int WordCount()
         {
@@ -57,28 +65,209 @@ namespace hOOt
 
         public void FreeMemory(bool freecache)
         {
-            // free deleted
-            _deleted.FreeMemory();
-
-            // clear hash
-            _hash.SaveIndex();
-
-            // free bitmap memory
-            foreach (var v in _index.Values)
+            lock (_lock)
             {
-                if (freecache)
+                _internalOP = true;
+                _log.Debug("freeing memory");
+                // free deleted
+                _deleted.FreeMemory();
+
+                // clear hash
+                _hash.SaveIndex();
+
+                // free bitmap memory
+                foreach (var v in _index.Values)
                 {
-                    long off = SaveBitmap(v.GetCompressedBits(), v.LastBitSaveLength, v.FileOffset);
-                    v.isDirty = false;
-                    v.FileOffset = off;
-                    v.FreeMemory(true);
+                    if (freecache)
+                    {
+                        long off = SaveBitmap(v.GetCompressedBits(), v.LastBitSaveLength, v.FileOffset);
+                        v.isDirty = false;
+                        v.FileOffset = off;
+                        v.FreeMemory(true);
+                    }
+                    else
+                        v.FreeMemory(false);
                 }
-                else
-                    v.FreeMemory(false);
+                _internalOP = false;
             }
         }
 
         public void Save()
+        {
+            lock (_lock)
+            {
+                _internalOP = true;
+                InternalSave();
+                _internalOP = false;
+            }
+        }
+
+        public void Index(int recordnumber, string text)
+        {
+            while (_internalOP) Thread.Sleep(50);
+
+            AddtoIndex(recordnumber, text);
+        }
+
+        public int Index(Document doc, bool deleteold)
+        {
+            while (_internalOP) Thread.Sleep(50);
+
+            _log.Debug("indexing doc : " + doc.FileName);
+            DateTime dt = FastDateTime.Now;
+
+            if (deleteold && doc.DocNumber > -1)
+                _deleted.Set(doc.DocNumber, true);
+
+            if (deleteold == true || doc.DocNumber == -1)
+                doc.DocNumber = _lastDocNum++;
+
+            // save doc to disk
+            string dstr = fastJSON.JSON.Instance.ToJSON(doc);
+            _docs.WriteData(Helper.GetBytes(doc.DocNumber, false), Helper.GetBytes(dstr));
+
+            // hash filename
+            _hash.Set(Helper.GetBytes(doc.FileName), doc.DocNumber);
+            _log.Debug("writing doc to disk (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
+
+            dt = FastDateTime.Now;
+            // index doc
+            AddtoIndex(doc.DocNumber, doc.Text);
+            _log.Debug("indexing time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
+
+            return _lastDocNum;
+        }
+
+        public IEnumerable<int> FindRows(string filter)
+        {
+            while (_internalOP) Thread.Sleep(50);
+
+            WAHBitArray bits = ExecutionPlan(filter);
+            // enumerate records
+            return bits.GetBitIndexes(true);
+        }
+
+        public IEnumerable<Document> FindDocuments(string filter)
+        {
+            while (_internalOP) Thread.Sleep(50);
+
+            WAHBitArray bits = ExecutionPlan(filter);
+            // enumerate documents
+            foreach (int i in bits.GetBitIndexes(true))
+            {
+                if (i > _lastDocNum)
+                    break;
+                byte[] b = _docs.ReadData(i);
+                Document d = (Document)fastJSON.JSON.Instance.ToObject(Helper.GetString(b));
+
+                yield return d;
+            }
+        }
+
+        public void RemoveDocument(int number)
+        {
+            while (_internalOP) Thread.Sleep(50);
+            // add number to deleted bitmap
+            _deleted.Set(number, true);
+        }
+
+        public void OptimizeIndex()
+        {
+            lock (_lock)
+            {
+                _internalOP = true;
+                InternalSave();
+                _log.Debug("optimizing index..");
+                DateTime dt = FastDateTime.Now;
+                _lastBitmapOffset = 0;
+                _bitmapFile.Flush();
+                _bitmapFile.Close();
+                // compact bitmap index file to new file
+                _bitmapFile = new FileStream(_Path + _FileName + ".bitmap$", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+                MemoryStream ms = new MemoryStream();
+                BinaryWriter bw = new BinaryWriter(ms, Encoding.UTF8);
+                // save words and bitmaps
+                using (FileStream words = new FileStream(_Path + _FileName + ".words", FileMode.Create))
+                {
+                    foreach (KeyValuePair<string, Cache> kv in _index)
+                    {
+                        bw.Write(kv.Key);
+                        uint[] ar = LoadBitmap(kv.Value.FileOffset);
+                        long offset = SaveBitmap(ar, ar.Length, 0);
+                        kv.Value.FileOffset = offset;
+                        bw.Write(kv.Value.FileOffset);
+                    }
+                    // save words
+                    byte[] b = ms.ToArray();
+                    words.Write(b, 0, b.Length);
+                    words.Flush();
+                    words.Close();
+                }
+                // rename files
+                _bitmapFile.Flush();
+                _bitmapFile.Close();
+                File.Delete(_Path + _FileName + ".bitmap");
+                File.Move(_Path + _FileName + ".bitmap$", _Path + _FileName + ".bitmap");
+                // reload everything
+                _bitmapFile = new FileStream(_Path + _FileName + ".bitmap", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+                _lastBitmapOffset = _bitmapFile.Seek(0L, SeekOrigin.End);
+                _log.Debug("optimizing index done = " + DateTime.Now.Subtract(dt).TotalSeconds + " sec");
+                _internalOP = false;
+            }
+        }
+
+        #region [  P R I V A T E   M E T H O D S  ]
+
+        private WAHBitArray ExecutionPlan(string filter)
+        {
+            _log.Debug("query : " + filter);
+            DateTime dt = FastDateTime.Now;
+            // query indexes
+            Dictionary<string, int> words = GenerateWordFreq(filter);
+
+            WAHBitArray bits = null;
+
+            foreach (string s in words.Keys)
+            {
+                Cache c;
+                if (_index.TryGetValue(s.Trim(), out c))
+                {
+                    // bits logic
+                    if (c.isLoaded == false)
+                        LoadCache(c);
+                    if (bits != null)
+                        bits = c.Op(bits, Cache.OPERATION.AND);
+                    else
+                        bits = c.GetBitmap();
+                }
+            }
+            if (bits == null)
+                return new WAHBitArray();
+            // remove deleted docs
+            if (bits.Length > _deleted.Length)
+                _deleted.Length = bits.Length;
+            else if (bits.Length < _deleted.Length)
+                bits.Length = _deleted.Length;
+
+            WAHBitArray ret = bits.And(_deleted.Not());
+            _log.Debug("query time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
+            return ret;
+        }
+
+        private void LoadCache(Cache c)
+        {
+            if (c.FileOffset != -1)
+            {
+                uint[] bits = LoadBitmap(c.FileOffset);
+                c.SetCompressedBits(bits);
+            }
+            else
+            {
+                c.SetCompressedBits(new uint[] { 0 });
+            }
+        }
+
+        private void InternalSave()
         {
             _log.Debug("saving index...");
             DateTime dt = FastDateTime.Now;
@@ -88,7 +277,7 @@ namespace hOOt
             _hash.SaveIndex();
 
             MemoryStream ms = new MemoryStream();
-            BinaryWriter bw = new BinaryWriter(ms,Encoding.UTF8);
+            BinaryWriter bw = new BinaryWriter(ms, Encoding.UTF8);
 
             // save words and bitmaps
             using (FileStream words = new FileStream(_Path + _FileName + ".words", FileMode.Create))
@@ -119,140 +308,18 @@ namespace hOOt
                     kv.Value.isDirty = false;
                 }
                 byte[] b = ms.ToArray();
-                words.Write(b, 0, b.Length); 
+                words.Write(b, 0, b.Length);
                 words.Flush();
                 words.Close();
             }
             _log.Debug("save time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
         }
 
-        public void Index(int recordnumber, string text)
-        {
-            AddtoIndex(recordnumber, text);
-        }
-
-        public int Index(Document doc, bool deleteold)
-        {
-            _log.Debug("indexing doc : " + doc.FileName);
-            DateTime dt = FastDateTime.Now;
-
-            if (deleteold && doc.DocNumber > -1)
-                _deleted.Set(doc.DocNumber, true);
-
-            if (deleteold == true || doc.DocNumber == -1)
-                doc.DocNumber = _lastDocNum++;
-
-            // save doc to disk
-            string dstr = fastJSON.JSON.Instance.ToJSON(doc);
-            _docs.WriteData(Helper.GetBytes(doc.DocNumber, false), Helper.GetBytes(dstr));
-            
-            // hash filename
-            _hash.Set(Helper.GetBytes(doc.FileName), doc.DocNumber);
-            _log.Debug("writing doc to disk (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
-
-            dt = FastDateTime.Now;
-            // index doc
-            AddtoIndex(doc.DocNumber, doc.Text);
-            _log.Debug("indexing time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
-
-            return _lastDocNum;
-        }
-
-        public IEnumerable<int> FindRows(string filter)
-        {
-            WAHBitArray bits = ExecutionPlan(filter);
-            // enumerate records
-            return bits.GetBitIndexes(true);
-        }
-
-        public IEnumerable<Document> FindDocuments(string filter)
-        {
-            WAHBitArray bits = ExecutionPlan(filter);
-            // enumerate documents
-            foreach (int i in bits.GetBitIndexes(true))
-            {
-                if (i > _lastDocNum)
-                    break;
-                byte[] b = _docs.ReadData(i);
-                Document d = (Document)fastJSON.JSON.Instance.ToObject(Helper.GetString(b));
-
-                yield return d;
-            }
-        }
-
-        private WAHBitArray ExecutionPlan(string filter)
-        {
-            _log.Debug("query : " + filter);
-            DateTime dt = FastDateTime.Now;
-            // query indexes
-            Dictionary<string, int> words = GenerateWordFreq(filter);
-
-            WAHBitArray bits = null ;
-            
-            foreach (string s in words.Keys)
-            {
-                Cache c;
-                if (_index.TryGetValue(s.Trim(), out c))
-                {
-                    // bits logic
-                    if (c.isLoaded == false)
-                        LoadCache(c);
-                    if (bits != null)
-                        bits = c.Op(bits, Cache.OPERATION.AND);
-                    else
-                        bits = c.GetBitmap();
-                }
-            }
-            if (bits == null)
-                return new WAHBitArray(1);
-            // remove deleted docs
-            if (bits.Length > _deleted.Length)
-                _deleted.Length = bits.Length;
-            else if (bits.Length < _deleted.Length)
-                bits.Length = _deleted.Length;
-
-            WAHBitArray ret = bits;//.And(_deleted.Not());
-            _log.Debug("query time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
-            return ret;
-        }
-
-        private void LoadCache(Cache c)
-        {
-            if (c.FileOffset != -1)
-            {
-                uint[] bits = LoadBitmap(c.FileOffset);
-                c.SetCompressedBits(bits);
-            }
-            else
-            {
-                c.SetCompressedBits(new uint[] { 0 });
-            }
-        }
-
-
-        public void RemoveDocument(int number)
-        {
-            // add number to deleted bitmap
-            _deleted.Set(number, true);
-        }
-
-        public void OptimizeIndex()
-        {
-            // TODO : write optimize index code here
-            // lock
-            // create new word file
-            // compact bitmap index file to new file
-            // unload everything
-            // rename files
-            // reload everything
-        }
-
-        #region [  P R I V A T E   M E T H O D S  ]
         private void ReadDeleted()
         {
             if (File.Exists(_Path + _FileName + ".deleted") == false)
             {
-                _deleted = new WAHBitArray(1);
+                _deleted = new WAHBitArray();
                 return;
             }
             using (FileStream del = new FileStream(_Path + _FileName + ".deleted",
@@ -300,6 +367,7 @@ namespace hOOt
                 long off = br.ReadInt64();
                 Cache c = new Cache();
                 c.isLoaded = false;
+                c.isDirty = false;
                 c.FileOffset = off;
                 try
                 {
@@ -324,39 +392,23 @@ namespace hOOt
         //-----------------------------------------------------------------
         private long SaveBitmap(uint[] bits, int lassize, long offset)
         {
-            long off = -1;
-            bool newrec = false;
+            long off = _lastBitmapOffset;
 
-            if (offset == -1)
-                newrec = true;
-            if (bits.Length > lassize)
-                newrec = true;
+            byte[] b = new byte[bits.Length * 4 + 7];
+            // write header data
+            b[0] = ((byte)'B');
+            b[1] = ((byte)'M');
+            Buffer.BlockCopy(Helper.GetBytes(bits.Length, false), 0, b, 2, 4);
+            b[6] = (0);
 
-            using (FileStream bmp = new FileStream(_Path + _FileName + ".bitmap", FileMode.OpenOrCreate,
-                                                   FileAccess.ReadWrite, FileShare.ReadWrite))
+            for (int i = 0; i < bits.Length; i++)
             {
-                if (newrec)
-                    off = bmp.Seek(0L, SeekOrigin.End);
-                else
-                    off = bmp.Seek(offset, SeekOrigin.Begin);
-
-                byte[] b = new byte[bits.Length * 4 + 7];
-                // write header data
-                b[0] = ((byte)'B');
-                b[1] = ((byte)'M');
-                Buffer.BlockCopy(Helper.GetBytes(bits.Length, false),0, b, 2, 4);
-                b[6]=(0);
-
-                for (int i = 0; i < bits.Length; i++)
-                {
-                    byte[] u = Helper.GetBytes((int)bits[i], false);
-                    Buffer.BlockCopy(u, 0, b, i * 4 + 7, 4);
-                }
-                bmp.Write(b, 0, b.Length);
-                bmp.Flush();
-                bmp.Close();
+                byte[] u = Helper.GetBytes((int)bits[i], false);
+                Buffer.BlockCopy(u, 0, b, i * 4 + 7, 4);
             }
-
+            _bitmapFile.Write(b, 0, b.Length);
+            _lastBitmapOffset += b.Length;
+            _bitmapFile.Flush();
             return off;
         }
 

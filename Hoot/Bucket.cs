@@ -36,7 +36,7 @@ namespace hOOt
         }
     }
 
-    public struct bytearr
+    internal struct bytearr
     {
         public bytearr(byte[] key)
         {

@@ -4,5 +4,10 @@ v1.0
 
 v1.1
 ----
-- tweaked parameters and reduced index size by 30%
+- tweaked parameters and reduced index size by 46%
+- speed increase bitmap index save 5x
 - bug fix sample ui 
+- bug fix bitarray resize
+- thread safe internals
+- code refactoring
+- OptimizeIndex() implemented

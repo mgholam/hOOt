@@ -54,7 +54,7 @@ namespace hOOt
                 _bits.Set(index, val);
             else
             {
-                _bits = new WAHBitArray(8);
+                _bits = new WAHBitArray();
                 _bits.Set(index, val);
             }
             isDirty = true;

@@ -21,6 +21,7 @@ namespace SampleApp
         }
 
         Hoot h;
+        DateTime _indextime;
 
         private void button2_Click(object sender, EventArgs e)
         {
@@ -78,6 +79,7 @@ namespace SampleApp
                 h = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index");
 
             string[] files = Directory.GetFiles(txtWhere.Text, "*", SearchOption.AllDirectories);
+            _indextime = DateTime.Now;
             backgroundWorker1.RunWorkerAsync(files);
         }
 
@@ -115,13 +117,14 @@ namespace SampleApp
                 }
                 catch { }
                 i++;
-                if (i > 3000)
+                if (i > 2000)
                 {
                     i = 0;
                     h.Save();
                 }
             }
             h.Save();
+            h.OptimizeIndex();
         }
 
         private void backgroundWorker1_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -133,6 +136,8 @@ namespace SampleApp
         {
             btnStart.Enabled = true;
             btnStop.Enabled = false;
+            lblIndexer.Text = "" + DateTime.Now.Subtract(_indextime).TotalSeconds + " sec";
+            MessageBox.Show("Indexing done : " + DateTime.Now.Subtract(_indextime).TotalSeconds + " sec");
         }
 
         private void btnStop_Click(object sender, EventArgs e)

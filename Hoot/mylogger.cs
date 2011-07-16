@@ -7,7 +7,7 @@ using System.IO;
 
 namespace hOOt
 {
-    public interface ILog
+    internal interface ILog
     {
         void Debug(object msg, params object[] objs);
         void Error(object msg, params object[] objs);
@@ -219,7 +219,7 @@ namespace hOOt
         #endregion
     }
 
-    public static class LogManager
+    internal static class LogManager
     {
         public static ILog GetLogger(Type obj)
         {

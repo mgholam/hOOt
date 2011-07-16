@@ -7,10 +7,10 @@ namespace hOOt
 {
     internal class WAHBitArray 
     {
-        public WAHBitArray(int size)
+        public WAHBitArray()
         {
-            _ba = new BitArray(size);
-            _size = size;
+            _ba = new BitArray(32);
+            _size = 32;
         }
 
         public WAHBitArray(BitArray bitarray)
@@ -35,8 +35,10 @@ namespace hOOt
             CheckBitArray();
             if (index > _size)
             {
-                _ba.Length = index+1;
-                _size = index+1;
+                int l = index / 32;
+                l++;
+                _ba.Length = l*32;
+                _size = l*32;
             }
             return _ba.Get(index);
         }
@@ -46,8 +48,10 @@ namespace hOOt
             CheckBitArray();
             if (index >= _size)
             {
-                _ba.Length = index+1;
-                _size = index+1;
+                int l = index / 32;
+                l++;
+                _ba.Length = l * 32;
+                _size = l * 32;
             }
             _ba.Set(index, val);
             //FreeMemory();
@@ -157,6 +161,20 @@ namespace hOOt
                     yield return i;
             }
         }
+
+        public string DebugPrint()
+        {
+            CheckBitArray();
+            StringBuilder sb = new StringBuilder();
+            for (int i=0;i<_ba.Length ;i++)
+            {
+                bool b = _ba[i];
+                sb.Append(b ? "1" : "0");
+            }
+
+            return sb.ToString();
+        }
+
 
         #region [  P R I V A T E  ]
         private void CheckBitArray()
@@ -278,7 +296,6 @@ namespace hOOt
         {
             int bit = 0;
             _ba = new BitArray(_size);
-            int mc = _size;
             foreach (uint ci in _compressed)
             {
                 if ((ci & 0x80000000) == 0)
@@ -288,11 +305,8 @@ namespace hOOt
                         uint mask = (uint)1 << j;
 
                         if ((ci & mask) > 0)
-                            Set(bit, true);// _ba[bit] = true;
+                            Set(bit, true);
                         bit++;
-                        if (bit >= mc)
-                            break;
-
                     }
                 }
                 else
@@ -302,10 +316,8 @@ namespace hOOt
                     {
                         for (int j = (int)c; j >= 0; j--)
                         {
-                            Set(bit, true);// _ba.Set(bit, true);
+                            Set(bit, true);
                             bit++;
-                            if (bit >= mc)
-                                break;
                         }
                     }
                     else
