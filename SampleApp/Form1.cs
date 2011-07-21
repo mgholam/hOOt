@@ -46,9 +46,10 @@ namespace SampleApp
                 MessageBox.Show("hOOt not loaded");
                 return;
             }
+
             listBox1.Items.Clear();
             DateTime dt = DateTime.Now;
-            foreach (Document d in h.FindDocuments(txtSearch.Text))
+            foreach (var d in h.FindDocumentFileNames(txtSearch.Text))
             {
                 listBox1.Items.Add(d);
             }
@@ -117,7 +118,7 @@ namespace SampleApp
                 }
                 catch { }
                 i++;
-                if (i > 2000)
+                if (i > 1000)
                 {
                     i = 0;
                     h.Save();

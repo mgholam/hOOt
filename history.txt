@@ -11,3 +11,10 @@ v1.1
 - thread safe internals
 - code refactoring
 - OptimizeIndex() implemented
+
+v1.2
+----
+- FindDocumentFileNames() for faster string only return
+- Better word extractor ~19% smaller index
+	- breaks up camel case compound words
+    - ignores strings >60 chars and less than 2 chars

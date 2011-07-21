@@ -10,6 +10,7 @@ namespace hOOt
 {
     public class Hoot
     {
+        private int MAX_STRING_LENGTH_IGNORE = 60;
 
         public Hoot(string IndexPath, string FileName)
         {
@@ -35,7 +36,18 @@ namespace hOOt
             // open bitmap index
             _bitmapFile = new FileStream(_Path + _FileName + ".bitmap", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
             _lastBitmapOffset = _bitmapFile.Seek(0L, SeekOrigin.End);
+
+            //writewordstodisk();
         }
+
+        //private void writewordstodisk()
+        //{
+        //    StringBuilder sb = new StringBuilder();
+        //    foreach (var c in _index.Keys)
+        //        sb.AppendLine(c);
+
+        //    File.WriteAllText("words.txt", sb.ToString());
+        //}
 
         private ILog _log = LogManager.GetLogger(typeof(Hoot));
         private Hash _hash;
@@ -155,12 +167,29 @@ namespace hOOt
             // enumerate documents
             foreach (int i in bits.GetBitIndexes(true))
             {
-                if (i > _lastDocNum)
+                if (i > _lastDocNum - 1)
                     break;
                 byte[] b = _docs.ReadData(i);
                 Document d = (Document)fastJSON.JSON.Instance.ToObject(Helper.GetString(b));
 
                 yield return d;
+            }
+        }
+
+        public IEnumerable<string> FindDocumentFileNames(string filter)
+        {
+            while (_internalOP) Thread.Sleep(50);
+
+            WAHBitArray bits = ExecutionPlan(filter);
+            // enumerate documents
+            foreach (int i in bits.GetBitIndexes(true))
+            {
+                if (i > _lastDocNum - 1)
+                    break;
+                byte[] b = _docs.ReadData(i);
+                Dictionary<string, object> d = (Dictionary<string, object>)fastJSON.JSON.Instance.Parse(Helper.GetString(b));
+
+                yield return d["FileName"].ToString();
             }
         }
 
@@ -223,14 +252,15 @@ namespace hOOt
             _log.Debug("query : " + filter);
             DateTime dt = FastDateTime.Now;
             // query indexes
-            Dictionary<string, int> words = GenerateWordFreq(filter);
+            string[] words = filter.Split(' ');
 
             WAHBitArray bits = null;
 
-            foreach (string s in words.Keys)
+            foreach (string s in words)
             {
                 Cache c;
-                if (_index.TryGetValue(s.Trim(), out c))
+                if (s == "") continue;
+                if (_index.TryGetValue(s.ToLowerInvariant(), out c))
                 {
                     // bits logic
                     if (c.isLoaded == false)
@@ -369,11 +399,7 @@ namespace hOOt
                 c.isLoaded = false;
                 c.isDirty = false;
                 c.FileOffset = off;
-                try
-                {
-                    _index.Add(s, c);
-                }
-                catch { }
+                _index.Add(s, c);
                 try
                 {
                     s = br.ReadString();
@@ -480,12 +506,7 @@ namespace hOOt
                 {
                     if (run != -1)
                     {
-                        string s = new string(chars, run, index - run - 1).ToLowerInvariant();
-                        int cc = 0;
-                        if (dic.TryGetValue(s, out cc))
-                            dic[s] = ++cc;
-                        else
-                            dic.Add(s, 1);
+                        ParseString(dic, chars, index, run);
                         run = -1;
                     }
                 }
@@ -496,16 +517,70 @@ namespace hOOt
 
             if (run != -1)
             {
-                string s = new string(chars, run, index - run).ToLowerInvariant();
-                int cc = 0;
-                if (dic.TryGetValue(s, out cc))
-                    dic[s] = ++cc;
-                else
-                    dic.Add(s, 1);
+                ParseString(dic, chars, index, run);
                 run = -1;
             }
 
             return dic;
+        }
+
+        private void ParseString(Dictionary<string, int> dic, char[] chars, int end, int start)
+        {
+            // check if upper lower case mix -> extract words
+            int uppers = 0;
+            bool found = false;
+            for (int i = start; i < end; i++)
+            {
+                if (char.IsUpper(chars[i]))
+                    uppers++;
+            }
+            // not all uppercase
+            if (uppers != end - start - 1)
+            {
+                int lastUpper = start;
+
+                string word = "";
+                for (int i = start + 1; i < end; i++)
+                {
+                    char c = chars[i];
+                    if (char.IsUpper(c))
+                    {
+                        found = true;
+                        word = new string(chars, lastUpper, i - lastUpper).ToLowerInvariant().Trim();
+                        AddDictionary(dic, word);
+                        lastUpper = i;
+                    }
+                }
+                if (lastUpper > start)
+                {
+                    string last = new string(chars, lastUpper, end - lastUpper).ToLowerInvariant().Trim();
+                    if (word != last)
+                        AddDictionary(dic, last);
+                }
+            }
+            if (found == false)
+            {
+                string s = new string(chars, start, end - start - 1).ToLowerInvariant().Trim();
+                AddDictionary(dic, s);
+            }
+        }
+
+        private void AddDictionary(Dictionary<string, int> dic, string word)
+        {
+            int l = word.Length;
+            if (l > MAX_STRING_LENGTH_IGNORE)
+                return;
+            if (l < 2)
+                return;
+            if (char.IsLetter(word[l - 1]) == false)
+                word = new string(word.ToCharArray(), 0, l - 2);
+            if (word.Length < 2)
+                return;
+            int cc = 0;
+            if (dic.TryGetValue(word, out cc))
+                dic[word] = ++cc;
+            else
+                dic.Add(word, 1);
         }
         #endregion
     }
