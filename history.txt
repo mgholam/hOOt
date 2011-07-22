@@ -18,3 +18,7 @@ v1.2
 - Better word extractor ~19% smaller index
 	- breaks up camel case compound words
     - ignores strings >60 chars and less than 2 chars
+
+v1.3
+----
+- Bug fix bitarray operations

@@ -273,6 +273,7 @@ namespace hOOt
             }
             if (bits == null)
                 return new WAHBitArray();
+
             // remove deleted docs
             if (bits.Length > _deleted.Length)
                 _deleted.Length = bits.Length;

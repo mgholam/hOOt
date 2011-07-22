@@ -60,14 +60,16 @@ namespace hOOt
         public int Length
         {
             set { _size = value; if (_ba != null) _ba.Length = value; }
-            get { return _size; }
+            get { CheckBitArray(); return _size; }
         }
 
         public WAHBitArray And(BitArray op)
         {
             CheckBitArray(op);
 
-            return new WAHBitArray(_ba.And(op));
+            BitArray b = (BitArray)_ba.Clone();
+
+            return new WAHBitArray(b.And(op));
         }
 
         public WAHBitArray And(WAHBitArray op)
@@ -88,21 +90,27 @@ namespace hOOt
         {
             CheckBitArray(op);
 
-            return op.Or(_ba);
+            BitArray b = (BitArray)_ba.Clone();
+            
+            return op.Or(b);
         }
 
         public WAHBitArray Not()
         {
             CheckBitArray();
 
-            return new WAHBitArray(_ba.Not());
+            BitArray b = (BitArray)_ba.Clone();
+
+            return new WAHBitArray(b.Not());
         }
 
         public WAHBitArray Xor(BitArray op)
         {
             CheckBitArray(op);
 
-            return new WAHBitArray(_ba.Xor(op));
+            BitArray b = (BitArray)_ba.Clone();
+
+            return new WAHBitArray(b.Xor(op));
         }
 
         public WAHBitArray Xor(WAHBitArray op)
