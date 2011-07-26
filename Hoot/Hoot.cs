@@ -280,7 +280,9 @@ namespace hOOt
             else if (bits.Length < _deleted.Length)
                 bits.Length = _deleted.Length;
 
-            WAHBitArray ret = bits.And(_deleted.Not());
+            WAHBitArray nd = _deleted.Not();
+
+            WAHBitArray ret = bits.And(nd);
             _log.Debug("query time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
             return ret;
         }
@@ -362,7 +364,7 @@ namespace hOOt
                 {
                     ar.Add((uint)Helper.ToInt32(b, 0));
                 }
-                _deleted = new WAHBitArray(ar.ToArray());
+                _deleted = new WAHBitArray(true, ar.ToArray());
 
                 del.Close();
             }

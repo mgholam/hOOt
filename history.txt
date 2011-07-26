@@ -22,3 +22,9 @@ v1.2
 v1.3
 ----
 - Bug fix bitarray operations
+
+v1.4
+----
+- replaced WAHBitarray with v2
+- ~9x bitmap save speed increase
+- ** index must be rebuilt from previous version **

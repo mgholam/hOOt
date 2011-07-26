@@ -82,7 +82,7 @@ namespace hOOt
 
         public void SetCompressedBits(uint[] bits)
         {
-            _bits = new WAHBitArray(bits);
+            _bits = new WAHBitArray(true, bits);
             LastBitSaveLength = bits.Length;
             isLoaded = true;
             isDirty = false;

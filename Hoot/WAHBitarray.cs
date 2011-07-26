@@ -5,7 +5,7 @@ using System.Collections;
 
 namespace hOOt
 {
-    internal class WAHBitArray 
+    internal class WAHBitArray
     {
         public WAHBitArray()
         {
@@ -35,10 +35,10 @@ namespace hOOt
             CheckBitArray();
             if (index > _size)
             {
-                int l = index / 32;
+                int l = index >> 5;
                 l++;
-                _ba.Length = l*32;
-                _size = l*32;
+                _ba.Length = l << 5;
+                _size = l << 5;
             }
             return _ba.Get(index);
         }
@@ -48,10 +48,10 @@ namespace hOOt
             CheckBitArray();
             if (index >= _size)
             {
-                int l = index / 32;
+                int l = index >> 5;
                 l++;
-                _ba.Length = l * 32;
-                _size = l * 32;
+                _ba.Length = l << 5;
+                _size = l << 5;
             }
             _ba.Set(index, val);
             //FreeMemory();
@@ -82,7 +82,7 @@ namespace hOOt
         public WAHBitArray Or(BitArray op)
         {
             CheckBitArray(op);
-           
+
             return new WAHBitArray(_ba.Or(op));
         }
 
@@ -91,7 +91,7 @@ namespace hOOt
             CheckBitArray(op);
 
             BitArray b = (BitArray)_ba.Clone();
-            
+
             return op.Or(b);
         }
 
@@ -140,7 +140,7 @@ namespace hOOt
 
             for (int i = 0; i < _ba.Count; i++)
             {
-                if (_ba[i]==false)
+                if (_ba[i] == false)
                     c++;
             }
             return c;
@@ -165,7 +165,7 @@ namespace hOOt
             for (int i = 0; i < _ba.Length; i++)
             {
                 bool b = _ba[i];
-                if(b==ones)
+                if (b == ones)
                     yield return i;
             }
         }
@@ -174,7 +174,7 @@ namespace hOOt
         {
             CheckBitArray();
             StringBuilder sb = new StringBuilder();
-            for (int i=0;i<_ba.Length ;i++)
+            for (int i = 0; i < _ba.Length; i++)
             {
                 bool b = _ba[i];
                 sb.Append(b ? "1" : "0");
@@ -333,6 +333,6 @@ namespace hOOt
                 }
             }
         }
-#endregion
+        #endregion
     }
 }
