@@ -50,6 +50,7 @@ namespace SampleApp
             listBox1.Items.Clear();
             DateTime dt = DateTime.Now;
             listBox1.BeginUpdate();
+            
             foreach (var d in h.FindDocumentFileNames(txtSearch.Text))
             {
                 listBox1.Items.Add(d);

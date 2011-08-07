@@ -5,6 +5,7 @@ using System.Collections;
 using System.IO;
 using System.Xml.Serialization;
 using System.Threading;
+using System.Text.RegularExpressions;
 
 namespace hOOt
 {
@@ -259,16 +260,55 @@ namespace hOOt
             foreach (string s in words)
             {
                 Cache c;
+                string word = s;
                 if (s == "") continue;
-                if (_index.TryGetValue(s.ToLowerInvariant(), out c))
+
+                Cache.OPERATION op = Cache.OPERATION.OR;
+
+                if (s.StartsWith("+"))
+                {
+                    op = Cache.OPERATION.AND;
+                    word = s.Replace("+","");
+                }
+
+                if (s.StartsWith("-"))
+                {
+                    op = Cache.OPERATION.ANDNOT;
+                    word = s.Replace("-","");
+                }
+
+                if (s.Contains("*") || s.Contains("?"))
+                {
+                    WAHBitArray wildbits = null;
+                    // do wildcard search
+                    Regex reg = new Regex(s.Replace("*", ".*").Replace("?", "."), RegexOptions.IgnoreCase);
+                    foreach (string key in _index.Keys)
+                    {
+                        if (reg.IsMatch(key))
+                        {
+                            c = _index[key];
+                            if (c.isLoaded == false)
+                                LoadCache(c);
+
+                            wildbits = DoBitOperation(wildbits, c, Cache.OPERATION.OR);
+                        }
+                    }
+                    if (bits == null)
+                        bits = wildbits;
+                    else
+                    {
+                        if (op == Cache.OPERATION.AND)
+                            bits = bits.And(wildbits);
+                        else
+                            bits = bits.Or(wildbits);
+                    }
+                }
+                else if (_index.TryGetValue(word.ToLowerInvariant(), out c))
                 {
                     // bits logic
                     if (c.isLoaded == false)
                         LoadCache(c);
-                    if (bits != null)
-                        bits = c.Op(bits, Cache.OPERATION.AND);
-                    else
-                        bits = c.GetBitmap();
+                    bits = DoBitOperation(bits, c, op);
                 }
             }
             if (bits == null)
@@ -285,6 +325,15 @@ namespace hOOt
             WAHBitArray ret = bits.And(nd);
             _log.Debug("query time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
             return ret;
+        }
+
+        private static WAHBitArray DoBitOperation(WAHBitArray bits, Cache c, Cache.OPERATION op)
+        {
+            if (bits != null)
+                bits = c.Op(bits, op);
+            else
+                bits = c.GetBitmap();
+            return bits;
         }
 
         private void LoadCache(Cache c)

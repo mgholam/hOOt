@@ -28,3 +28,8 @@ v1.4
 - replaced WAHBitarray with v2
 - ~9x bitmap save speed increase
 - ** index must be rebuilt from previous version **
+
+v1.5
+----
+- added support for wildcard characters (*,?)
+- added support for AND (+) , NOT (-) queries

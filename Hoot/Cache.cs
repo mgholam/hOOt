@@ -35,7 +35,7 @@ namespace hOOt
         {
             AND,
             OR,
-            NOT
+            ANDNOT
         }
 
         public Cache()
@@ -100,7 +100,7 @@ namespace hOOt
             else if (op == OPERATION.OR)
                 return _bits.Or(bits);
             else
-                return _bits.Not();
+                return bits.And(_bits.Not());
         }
 
         public WAHBitArray GetBitmap()
