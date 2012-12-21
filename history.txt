@@ -33,3 +33,14 @@ v1.5
 ----
 - added support for wildcard characters (*,?)
 - added support for AND (+) , NOT (-) queries
+
+v2.0
+----
+- updated and embedded fastjson v2.0.11 in the project
+- post back code from RaptorDB
+- thread safe locks updates
+- bug fix logger threading
+- restructured source code
+- fixed sample form tab order
+- 
+

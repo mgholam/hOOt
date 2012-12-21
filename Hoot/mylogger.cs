@@ -21,16 +21,8 @@ namespace hOOt
         public static readonly FileLogger Instance = new FileLogger();
         private FileLogger()
         {
-            AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
-            AppDomain.CurrentDomain.DomainUnload += new EventHandler(CurrentDomain_ProcessExit);
-
-            _worker = new Thread(new ThreadStart(Writer));
-            _worker.IsBackground = true;
-            _worker.Start();
         }
 
-        private Thread _worker;
-        private bool _working = true;
         private Queue _que = new Queue();
         private StreamWriter _output;
         private string _filename;
@@ -39,6 +31,7 @@ namespace hOOt
         private DateTime _lastFileDate;
         private bool _showMethodName = false;
         private string _FilePath = "";
+        System.Timers.Timer _saveTimer;
 
         public bool ShowMethodNames
         {
@@ -47,6 +40,7 @@ namespace hOOt
 
         public void Init(string filename, int sizelimitKB, bool showmethodnames)
         {
+            _que = new Queue();
             _showMethodName = showmethodnames;
             _sizeLimit = sizelimitKB;
             _filename = filename;
@@ -55,29 +49,42 @@ namespace hOOt
             if (_FilePath != "")
             {
                 _FilePath = Directory.CreateDirectory(_FilePath).FullName;
-                if (_FilePath.EndsWith("\\") == false)
-                    _FilePath += "\\";
+                if (_FilePath.EndsWith(Path.DirectorySeparatorChar.ToString()) == false)
+                    _FilePath += Path.DirectorySeparatorChar.ToString();
             }
             _output = new StreamWriter(filename, true);
             FileInfo fi = new FileInfo(filename);
             _lastSize = fi.Length;
             _lastFileDate = fi.LastWriteTime;
+
+            _saveTimer = new System.Timers.Timer(500);
+            _saveTimer.Elapsed += new System.Timers.ElapsedEventHandler(_saveTimer_Elapsed);
+            _saveTimer.Enabled = true;
+            _saveTimer.AutoReset = true;
         }
 
-        private void shutdown()
+        void _saveTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            _working = false;
-            _worker.Abort();
+            WriteData();
         }
 
-        void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        public void ShutDown()
         {
-            shutdown();
+            WriteData();
+            if (_output != null)
+            {
+                _output.Flush();
+                _output.Close();
+                _output = null;
+            }
         }
 
-        private void Writer()
+        //object _writelock = new object();
+        private void WriteData()
         {
-            while (_working)
+            if (_output == null)
+                return;
+            lock (_que)
             {
                 while (_que.Count > 0)
                 {
@@ -116,7 +123,7 @@ namespace hOOt
                             int count = 1;
                             while (File.Exists(_FilePath + Path.GetFileNameWithoutExtension(_filename) + "." + count.ToString("0000")))
                             {
-                                File.Move(_FilePath+ Path.GetFileNameWithoutExtension(_filename) + "." + count.ToString("0000"),
+                                File.Move(_FilePath + Path.GetFileNameWithoutExtension(_filename) + "." + count.ToString("0000"),
                                    _FilePath +
                                    Path.GetFileNameWithoutExtension(_filename) +
                                    "." + count.ToString("0000") +
@@ -139,32 +146,35 @@ namespace hOOt
                 }
                 if (_output != null)
                     _output.Flush();
-                Thread.Sleep(500);
             }
-            _output.Flush();
-            _output.Close();
         }
 
         private string FormatLog(string log, string type, string meth, string msg, object[] objs)
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine(
-                "" + DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss") +
-                "|" + log +
-                "|" + Thread.CurrentThread.ManagedThreadId +
-                "|" + type +
-                "|" + meth +
-                "| " + msg);
+            sb.Append(DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss"));
+            sb.Append("|");
+            sb.Append(log);
+            sb.Append("|");
+            sb.Append(Thread.CurrentThread.ManagedThreadId.ToString());
+            sb.Append("|");
+            sb.Append(type);
+            sb.Append("|");
+            sb.Append(meth);
+            sb.Append("| ");
+            sb.AppendLine(msg);
 
-            foreach (object o in objs)
-                sb.AppendLine("" + o);
+            if (objs != null)
+                foreach (object o in objs)
+                    sb.AppendLine("" + o);
 
             return sb.ToString();
         }
 
         public void Log(string logtype, string type, string meth, string msg, params object[] objs)
         {
-            _que.Enqueue(FormatLog(logtype, type, meth, msg, objs));
+            lock (_que)
+                _que.Enqueue(FormatLog(logtype, type, meth, msg, objs));
         }
     }
 
@@ -230,6 +240,10 @@ namespace hOOt
         {
             FileLogger.Instance.Init(filename, sizelimitKB, showmethodnames);
         }
-    }
 
+        public static void Shutdown()
+        {
+            FileLogger.Instance.ShutDown();
+        }
+    }
 }

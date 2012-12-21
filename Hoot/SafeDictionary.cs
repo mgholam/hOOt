@@ -8,11 +8,11 @@ namespace hOOt
     internal class SafeDictionary<TKey, TValue>
     {
         private readonly object _Padlock = new object();
-        private readonly Dictionary<TKey, TValue> _Dictionary = new Dictionary<TKey, TValue>();
+        private readonly Dictionary<TKey, TValue> _Dictionary = null;
 
-        public SafeDictionary(int capacity, IEqualityComparer<TKey> comp)
+        public SafeDictionary(int capacity)
         {
-            _Dictionary = new Dictionary<TKey, TValue>(capacity, comp);
+            _Dictionary = new Dictionary<TKey, TValue>(capacity);
         }
 
         public SafeDictionary()
@@ -22,20 +22,34 @@ namespace hOOt
 
         public bool TryGetValue(TKey key, out TValue value)
         {
-            return _Dictionary.TryGetValue(key, out value);
+            lock (_Padlock)
+                return _Dictionary.TryGetValue(key, out value);
         }
 
         public TValue this[TKey key]
         {
             get
             {
-                return _Dictionary[key];
+                lock (_Padlock)
+                    return _Dictionary[key];
             }
             set
             {
-                _Dictionary[key] = value;
+                lock (_Padlock)
+                    _Dictionary[key] = value;
             }
         }
+
+        public int Count
+        {
+            get { lock (_Padlock) return _Dictionary.Count; }
+        }
+
+        public ICollection<KeyValuePair<TKey, TValue>> GetList()
+        {
+            return (ICollection<KeyValuePair<TKey, TValue>>)_Dictionary;
+        }
+
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
         {
             return ((ICollection<KeyValuePair<TKey, TValue>>)_Dictionary).GetEnumerator();
@@ -47,11 +61,62 @@ namespace hOOt
             {
                 if (_Dictionary.ContainsKey(key) == false)
                     _Dictionary.Add(key, value);
-                else
-                    _Dictionary[key] = value;
             }
         }
+
+        public TKey[] Keys()
+        {
+            lock (_Padlock)
+            {
+                TKey[] keys = new TKey[_Dictionary.Keys.Count];
+                _Dictionary.Keys.CopyTo(keys, 0);
+                return keys;
+            }
+        }
+
+        public bool Remove(TKey key)
+        {
+            lock (_Padlock)
+                return _Dictionary.Remove(key);
+        }
     }
+
+    internal class SafeSortedList<T, V>
+    {
+        private object _padlock = new object();
+        SortedList<T, V> _list = new SortedList<T, V>();
+
+        public int Count
+        {
+            get { lock (_padlock) return _list.Count; }
+        }
+
+        public void Add(T key, V val)
+        {
+            lock (_padlock)
+                _list.Add(key, val);
+        }
+
+        public void Remove(T key)
+        {
+            if (key == null)
+                return;
+            lock (_padlock)
+                _list.Remove(key);
+        }
+
+        public T GetKey(int index)
+        {
+            lock (_padlock) return _list.Keys[index];
+        }
+
+        public V GetValue(int index)
+        {
+            lock (_padlock) return _list.Values[index];
+        }
+    }
+
+    //------------------------------------------------------------------------------------------------------------------
 
     internal static class FastDateTime
     {
@@ -68,12 +133,31 @@ namespace hOOt
         }
     }
 
+    //------------------------------------------------------------------------------------------------------------------
+
     internal static class Helper
     {
+        public static MurmurHash2Unsafe MurMur = new MurmurHash2Unsafe();
+        public static int CompareMemCmp(byte[] left, byte[] right)
+        {
+            int c = left.Length;
+            if (c > right.Length)
+                c = right.Length;
+            return memcmp(left, right, c);
+        }
+
+        [DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int memcmp(byte[] arr1, byte[] arr2, int cnt);
+
         internal static unsafe int ToInt32(byte[] value, int startIndex, bool reverse)
         {
             if (reverse)
-                Array.Reverse(value, startIndex, 4);
+            {
+                byte[] b = new byte[4];
+                Buffer.BlockCopy(value, startIndex, b, 0, 4);
+                Array.Reverse(b);
+                return ToInt32(b, 0);
+            }
 
             return ToInt32(value, startIndex);
         }
@@ -89,7 +173,12 @@ namespace hOOt
         internal static unsafe long ToInt64(byte[] value, int startIndex, bool reverse)
         {
             if (reverse)
-                Array.Reverse(value, startIndex, 8);
+            {
+                byte[] b = new byte[8];
+                Buffer.BlockCopy(value, startIndex, b, 0, 8);
+                Array.Reverse(b);
+                return ToInt64(b, 0);
+            }
             return ToInt64(value, startIndex);
         }
 
@@ -104,7 +193,12 @@ namespace hOOt
         internal static unsafe short ToInt16(byte[] value, int startIndex, bool reverse)
         {
             if (reverse)
-                Array.Reverse(value, startIndex, 2);
+            {
+                byte[] b = new byte[2];
+                Buffer.BlockCopy(value, startIndex, b, 0, 2);
+                Array.Reverse(b);
+                return ToInt16(b, 0);
+            }
             return ToInt16(value, startIndex);
         }
 
@@ -128,7 +222,7 @@ namespace hOOt
             return buffer;
         }
 
-        internal static unsafe byte[] GetBytes(int num, bool reverse)
+        public static unsafe byte[] GetBytes(int num, bool reverse)
         {
             byte[] buffer = new byte[4];
             fixed (byte* numRef = buffer)
@@ -140,64 +234,26 @@ namespace hOOt
             return buffer;
         }
 
-        internal static int Compare(bytearr left, bytearr right)
+        public static unsafe byte[] GetBytes(short num, bool reverse)
         {
-            int lL = left.val.Length;
-            int rL = right.val.Length;
-            if (lL < rL)
-                return -1;
-            else if (lL > rL)
-                return 1;
-            // key len equal
-            int len = lL;
-
-            for (int i = 0; i < len; i++)
+            byte[] buffer = new byte[2];
+            fixed (byte* numRef = buffer)
             {
-                int l = left.val[i];
-                int r = right.val[i];
-                int k = l - r;
-                if (k == 0)
-                    continue;
-                if (k < 0)
-                    return -1;
-                else
-                    return 1;
+                *((short*)numRef) = num;
             }
-            return 0;
+            if (reverse)
+                Array.Reverse(buffer);
+            return buffer;
         }
 
-        internal static byte[] GetBytes(string s)
+        public static byte[] GetBytes(string s)
         {
             return Encoding.UTF8.GetBytes(s);
-
-            //byte[] b = new byte[s.Length];
-            //char[] cc = s.ToCharArray();
-            //int l = cc.Length;
-            //for (int i = 0; i < l; i++)//foreach (char c in s)
-            //    b[i] = (byte)cc[i];// c;
-            //return b;
         }
 
-        internal static string GetString(byte[] bytes)
+        internal static string GetString(byte[] buffer, int index, short keylength)
         {
-            return Encoding.UTF8.GetString(bytes);
-            //char[] cc = new char[bytes.Length];
-            //int i=0;
-            //foreach (byte b in bytes)
-            //    cc[i++] = (char)b;
-
-            //return new string(cc);
-        }
-
-        internal static string GetString(byte[] buffer, int index, short length)
-        {
-            return Encoding.UTF8.GetString(buffer, index, length);
-            //char[] cc = new char[keylength];
-
-            //for (int i = 0; i < keylength; i++)
-            //    cc[i] = (char)buffer[index + i];
-
-            //return new string(cc);
+            return Encoding.UTF8.GetString(buffer, index, keylength);
         }
     }
 }

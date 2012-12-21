@@ -28,11 +28,11 @@ namespace SampleApp
             MessageBox.Show("" + h.WordCount());
         }
 
-        private void button3_Click(object sender, EventArgs e)
-        {
-            h.FreeMemory(false);
-            GC.Collect(2);
-        }
+        //private void button3_Click(object sender, EventArgs e)
+        //{
+        //    h.FreeMemory(false);
+        //    GC.Collect(2);
+        //}
 
         private void button4_Click(object sender, EventArgs e)
         {
@@ -128,7 +128,7 @@ namespace SampleApp
                 }
             }
             h.Save();
-            h.OptimizeIndex();
+            //h.OptimizeIndex();
         }
 
         private void backgroundWorker1_ProgressChanged(object sender, ProgressChangedEventArgs e)

@@ -32,24 +32,33 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="fastJSON">
-      <HintPath>..\fastJSON.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MGIndex\BitmapIndex.cs" />
     <Compile Include="Cache.cs" />
+    <Compile Include="MGIndex\DataTypes.cs" />
+    <Compile Include="fastJSON\Formatter.cs" />
+    <Compile Include="fastJSON\Getters.cs" />
+    <Compile Include="fastJSON\JSON.cs" />
+    <Compile Include="fastJSON\JsonParser.cs" />
+    <Compile Include="fastJSON\JsonSerializer.cs" />
+    <Compile Include="fastJSON\Reflection.cs" />
+    <Compile Include="Global.cs" />
     <Compile Include="Hoot.cs" />
-    <Compile Include="IndexFile.cs" />
-    <Compile Include="MurMurHash2.cs" />
+    <Compile Include="MGIndex\IndexFile.cs" />
+    <Compile Include="MGIndex\KeyStore.cs" />
+    <Compile Include="MGIndex\MGIndex.cs" />
+    <Compile Include="MGIndex\MurMurHash2.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="mylogger.cs" />
-    <Compile Include="Bucket.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SafeDictionary.cs" />
-    <Compile Include="StorageFile.cs" />
-    <Compile Include="WAHBitarray2.cs" />
+    <Compile Include="MGIndex\StorageFile.cs" />
+    <Compile Include="MGIndex\WAHBitarray2.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
