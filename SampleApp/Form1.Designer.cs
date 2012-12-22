@@ -59,7 +59,7 @@
             this.button2.Location = new System.Drawing.Point(263, 19);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(91, 23);
-            this.button2.TabIndex = 7;
+            this.button2.TabIndex = 10;
             this.button2.Text = "Count Words";
             this.button2.UseVisualStyleBackColor = true;
             this.button2.Click += new System.EventHandler(this.button2_Click);
@@ -69,7 +69,7 @@
             this.button3.Location = new System.Drawing.Point(457, 19);
             this.button3.Name = "button3";
             this.button3.Size = new System.Drawing.Size(91, 23);
-            this.button3.TabIndex = 2;
+            this.button3.TabIndex = 12;
             this.button3.Text = "Free Memory";
             this.button3.UseVisualStyleBackColor = true;
             this.button3.Visible = false;
@@ -79,7 +79,7 @@
             this.button4.Location = new System.Drawing.Point(360, 19);
             this.button4.Name = "button4";
             this.button4.Size = new System.Drawing.Size(91, 23);
-            this.button4.TabIndex = 8;
+            this.button4.TabIndex = 11;
             this.button4.Text = "Save Index";
             this.button4.UseVisualStyleBackColor = true;
             this.button4.Click += new System.EventHandler(this.button4_Click);
@@ -92,7 +92,7 @@
             this.groupBox1.Location = new System.Drawing.Point(3, 3);
             this.groupBox1.Name = "groupBox1";
             this.groupBox1.Size = new System.Drawing.Size(565, 47);
-            this.groupBox1.TabIndex = 4;
+            this.groupBox1.TabIndex = 0;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "1. Set Index Storage Directory";
             // 
@@ -101,7 +101,7 @@
             this.button6.Location = new System.Drawing.Point(6, 16);
             this.button6.Name = "button6";
             this.button6.Size = new System.Drawing.Size(44, 23);
-            this.button6.TabIndex = 0;
+            this.button6.TabIndex = 1;
             this.button6.Text = "...";
             this.button6.UseVisualStyleBackColor = true;
             this.button6.Click += new System.EventHandler(this.button6_Click);
@@ -113,7 +113,7 @@
             this.txtIndexFolder.Location = new System.Drawing.Point(56, 19);
             this.txtIndexFolder.Name = "txtIndexFolder";
             this.txtIndexFolder.Size = new System.Drawing.Size(502, 20);
-            this.txtIndexFolder.TabIndex = 1;
+            this.txtIndexFolder.TabIndex = 2;
             this.txtIndexFolder.Text = "Index";
             // 
             // groupBox2
@@ -124,7 +124,7 @@
             this.groupBox2.Location = new System.Drawing.Point(3, 50);
             this.groupBox2.Name = "groupBox2";
             this.groupBox2.Size = new System.Drawing.Size(565, 45);
-            this.groupBox2.TabIndex = 5;
+            this.groupBox2.TabIndex = 3;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "2. Set Folder to Index";
             // 
@@ -133,7 +133,7 @@
             this.button7.Location = new System.Drawing.Point(6, 16);
             this.button7.Name = "button7";
             this.button7.Size = new System.Drawing.Size(44, 23);
-            this.button7.TabIndex = 2;
+            this.button7.TabIndex = 4;
             this.button7.Text = "...";
             this.button7.UseVisualStyleBackColor = true;
             this.button7.Click += new System.EventHandler(this.button7_Click);
@@ -145,7 +145,7 @@
             this.txtWhere.Location = new System.Drawing.Point(56, 19);
             this.txtWhere.Name = "txtWhere";
             this.txtWhere.Size = new System.Drawing.Size(502, 20);
-            this.txtWhere.TabIndex = 3;
+            this.txtWhere.TabIndex = 5;
             // 
             // groupBox3
             // 
@@ -160,7 +160,7 @@
             this.groupBox3.Location = new System.Drawing.Point(3, 95);
             this.groupBox3.Name = "groupBox3";
             this.groupBox3.Size = new System.Drawing.Size(565, 69);
-            this.groupBox3.TabIndex = 5;
+            this.groupBox3.TabIndex = 6;
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "3. Start/Stop Indexer";
             // 
@@ -169,7 +169,7 @@
             this.button1.Location = new System.Drawing.Point(10, 19);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(75, 23);
-            this.button1.TabIndex = 4;
+            this.button1.TabIndex = 7;
             this.button1.Text = "Load hOOt";
             this.button1.UseVisualStyleBackColor = true;
             this.button1.Click += new System.EventHandler(this.button1_Click_1);
@@ -189,7 +189,7 @@
             this.btnStop.Location = new System.Drawing.Point(182, 19);
             this.btnStop.Name = "btnStop";
             this.btnStop.Size = new System.Drawing.Size(75, 23);
-            this.btnStop.TabIndex = 6;
+            this.btnStop.TabIndex = 9;
             this.btnStop.Text = "Stop";
             this.btnStop.UseVisualStyleBackColor = true;
             this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
@@ -199,7 +199,7 @@
             this.btnStart.Location = new System.Drawing.Point(101, 19);
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(75, 23);
-            this.btnStart.TabIndex = 5;
+            this.btnStart.TabIndex = 8;
             this.btnStart.Text = "Start";
             this.btnStart.UseVisualStyleBackColor = true;
             this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
@@ -214,7 +214,7 @@
             this.groupBox4.Location = new System.Drawing.Point(3, 164);
             this.groupBox4.Name = "groupBox4";
             this.groupBox4.Size = new System.Drawing.Size(565, 226);
-            this.groupBox4.TabIndex = 6;
+            this.groupBox4.TabIndex = 13;
             this.groupBox4.TabStop = false;
             this.groupBox4.Text = "4. Search";
             // 
@@ -227,7 +227,7 @@
             this.listBox1.Location = new System.Drawing.Point(6, 62);
             this.listBox1.Name = "listBox1";
             this.listBox1.Size = new System.Drawing.Size(552, 160);
-            this.listBox1.TabIndex = 11;
+            this.listBox1.TabIndex = 16;
             this.listBox1.DoubleClick += new System.EventHandler(this.listBox1_DoubleClick);
             // 
             // lblStatus
@@ -244,7 +244,7 @@
             this.btnSearch.Location = new System.Drawing.Point(6, 17);
             this.btnSearch.Name = "btnSearch";
             this.btnSearch.Size = new System.Drawing.Size(64, 23);
-            this.btnSearch.TabIndex = 9;
+            this.btnSearch.TabIndex = 14;
             this.btnSearch.Text = "Go";
             this.btnSearch.UseVisualStyleBackColor = true;
             this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
@@ -256,7 +256,7 @@
             this.txtSearch.Location = new System.Drawing.Point(77, 19);
             this.txtSearch.Name = "txtSearch";
             this.txtSearch.Size = new System.Drawing.Size(481, 20);
-            this.txtSearch.TabIndex = 10;
+            this.txtSearch.TabIndex = 15;
             this.txtSearch.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtSearch_KeyDown);
             // 
             // backgroundWorker1

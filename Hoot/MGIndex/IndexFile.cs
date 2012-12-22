@@ -390,7 +390,6 @@ namespace hOOt
         internal void BitmapFlush()
         {
             _bitmap.Commit(Global.FreeBitmapMemoryOnSave);
-            _bitmap.Flush();
         }
     }
 }

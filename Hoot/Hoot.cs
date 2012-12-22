@@ -17,12 +17,12 @@ namespace hOOt
             _FileName = FileName;
             if (_Path.EndsWith(Path.DirectorySeparatorChar.ToString()) == false) _Path += Path.DirectorySeparatorChar;
             Directory.CreateDirectory(IndexPath);
-            LogManager.Configure(_Path + _FileName + ".txt", 200, false);
+            LogManager.Configure(_Path + "log.txt", 200, false);
             _log.Debug("\r\n\r\n");
             _log.Debug("Starting hOOt....");
             _log.Debug("Storage Folder = " + _Path);
 
-            _docs = new RaptorDBString(_Path + _FileName + ".docs", false);
+            _docs = new RaptorDBString(_Path + "files.docs", false);
             _bitmaps = new BitmapIndex(_Path, _FileName + ".mgbmp");
             _lastDocNum = (int)_docs.Count();
             // read words
@@ -35,30 +35,28 @@ namespace hOOt
         private BitmapIndex _bitmaps;
         private BoolIndex _deleted;
         private ILog _log = LogManager.GetLogger(typeof(Hoot));
-        int _lastDocNum = 0;
+        private int _lastDocNum = 0;
         private string _FileName = "words";
         private string _Path = "";
         private RaptorDBString _docs;
 
-        public int WordCount()
+        public int WordCount
         {
-            return _words.Count;
+            get { return _words.Count; }
         }
 
         public int DocumentCount
         {
-            get
-            {
-                return _lastDocNum;
-            }
+            get { return _lastDocNum - (int)_deleted.GetBits().CountOnes(); }
         }
 
-        public void FreeMemory(bool freecache)
-        {
-            _log.Debug("freeing memory");
-            // free deleted
-            _deleted.FreeMemory();
-        }
+        //public void FreeMemory(bool freecache)
+        //{
+        //    _log.Debug("freeing memory");
+        //    // free deleted
+        //    _deleted.FreeMemory();
+        //    _bitmaps.Commit(true);
+        //}
 
         public void Save()
         {
@@ -138,50 +136,30 @@ namespace hOOt
             _deleted.Set(true, number);
         }
 
-        //public void OptimizeIndex()
-        //{
-        //    lock (_lock)
-        //    {
-        //        //_internalOP = true;
-        //        InternalSave();
-        //        _log.Debug("optimizing index..");
-        //        DateTime dt = FastDateTime.Now;
-        //        //_lastBitmapOffset = 0;
-        //        //_bitmapFile.Flush();
-        //        //_bitmapFile.Close();
-        //        // compact bitmap index file to new file
-        //        _bitmapFile = new FileStream(_Path + _FileName + ".bitmap$", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-        //        MemoryStream ms = new MemoryStream();
-        //        BinaryWriter bw = new BinaryWriter(ms, Encoding.UTF8);
-        //        // save words and bitmaps
-        //        using (FileStream words = new FileStream(_Path + _FileName + ".words", FileMode.Create))
-        //        {
-        //            foreach (KeyValuePair<string, int> kv in _wordindex)
-        //            {
-        //                bw.Write(kv.Key);
-        //                uint[] ar = LoadBitmap(kv.Value.FileOffset);
-        //                long offset = SaveBitmap(ar);
-        //                kv.Value.FileOffset = offset;
-        //                bw.Write(kv.Value.FileOffset);
-        //            }
-        //            // save words
-        //            byte[] b = ms.ToArray();
-        //            words.Write(b, 0, b.Length);
-        //            words.Flush();
-        //            words.Close();
-        //        }
-        //        // rename files
-        //        _bitmapFile.Flush();
-        //        _bitmapFile.Close();
-        //        File.Delete(_Path + _FileName + ".bitmap");
-        //        File.Move(_Path + _FileName + ".bitmap$", _Path + _FileName + ".bitmap");
-        //        // reload everything
-        //        _bitmapFile = new FileStream(_Path + _FileName + ".bitmap", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-        //        _lastBitmapOffset = _bitmapFile.Seek(0L, SeekOrigin.End);
-        //        _log.Debug("optimizing index done = " + DateTime.Now.Subtract(dt).TotalSeconds + " sec");
-        //        _internalOP = false;
-        //    }
-        //}
+        public bool RemoveDocument(string filename)
+        {
+            // remove doc based on filename
+            byte[] b;
+            if (_docs.Get(filename.ToLower(), out b))
+            {
+                Document d = fastJSON.JSON.Instance.ToObject<Document>(Encoding.Unicode.GetString(b));
+                RemoveDocument(d.DocNumber);
+                return true;
+            }
+            return false;
+        }
+
+        public bool IsIndexed(string filename)
+        {
+            byte[] b;
+            return _docs.Get(filename.ToLower(), out b);
+        }
+
+        public void OptimizeIndex()
+        {
+            _bitmaps.Commit(false);
+            _bitmaps.Optimize();
+        }
 
         #region [  P R I V A T E   M E T H O D S  ]
 
@@ -297,10 +275,10 @@ namespace hOOt
                 // save words and bitmaps
                 using (FileStream words = new FileStream(_Path + _FileName + ".words", FileMode.Create))
                 {
-                    foreach (KeyValuePair<string, int> kv in _words)
-                    {
-                        bw.Write(kv.Key);
-                        bw.Write(kv.Value);
+                    foreach (string key in _words.Keys())
+                    {                        
+                        bw.Write(key);
+                        bw.Write(_words[key]);
                     }
                     byte[] b = ms.ToArray();
                     words.Write(b, 0, b.Length);
@@ -358,7 +336,7 @@ namespace hOOt
 
         private Dictionary<string, int> GenerateWordFreq(string text)
         {
-            Dictionary<string, int> dic = new Dictionary<string, int>();//50000);
+            Dictionary<string, int> dic = new Dictionary<string, int>(50000);
 
             char[] chars = text.ToCharArray();
             int index = 0;

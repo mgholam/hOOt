@@ -280,19 +280,6 @@ namespace hOOt
             }
         }
 
-        //public uint[] GetCompressed()
-        //{
-        //    uint[] data = _uncompressed;
-        //    if (_usingOffsets)
-        //    {
-        //        data = UnpackOffsets();
-        //    }
-        //    else if (_uncompressed == null)
-        //        return new uint[] { 0 };
-        //    Compress(data);
-        //    return _compressed;
-        //}
-
         public uint[] GetCompressed(out TYPE type)
         {
             type = TYPE.WAH;

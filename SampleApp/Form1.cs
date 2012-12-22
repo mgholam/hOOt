@@ -20,12 +20,12 @@ namespace SampleApp
             InitializeComponent();
         }
 
-        Hoot h;
+        Hoot hoot;
         DateTime _indextime;
 
         private void button2_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("" + h.WordCount());
+            MessageBox.Show("Words = " + hoot.WordCount.ToString("#,#") + "\r\nDocuments = " + hoot.DocumentCount.ToString("#,#"));
         }
 
         //private void button3_Click(object sender, EventArgs e)
@@ -36,12 +36,12 @@ namespace SampleApp
 
         private void button4_Click(object sender, EventArgs e)
         {
-            h.Save();
+            hoot.Save();
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
         {
-            if (h == null)
+            if (hoot == null)
             {
                 MessageBox.Show("hOOt not loaded");
                 return;
@@ -51,7 +51,7 @@ namespace SampleApp
             DateTime dt = DateTime.Now;
             listBox1.BeginUpdate();
             
-            foreach (var d in h.FindDocumentFileNames(txtSearch.Text))
+            foreach (var d in hoot.FindDocumentFileNames(txtSearch.Text))
             {
                 listBox1.Items.Add(d);
             }
@@ -62,7 +62,7 @@ namespace SampleApp
         private void button7_Click(object sender, EventArgs e)
         {
             FolderBrowserDialog fbd = new FolderBrowserDialog();
-            fbd.SelectedPath = Directory.GetCurrentDirectory();
+            fbd.SelectedPath = txtWhere.Text;
             if (fbd.ShowDialog() == DialogResult.OK)
             {
                 txtWhere.Text = fbd.SelectedPath;
@@ -79,8 +79,8 @@ namespace SampleApp
 
             btnStart.Enabled = false;
             btnStop.Enabled = true;
-            if (h == null)
-                h = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index");
+            if (hoot == null)
+                hoot = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index");
 
             string[] files = Directory.GetFiles(txtWhere.Text, "*", SearchOption.AllDirectories);
             _indextime = DateTime.Now;
@@ -112,23 +112,26 @@ namespace SampleApp
                 backgroundWorker1.ReportProgress(1, fn);
                 try
                 {
-                    TextReader tf = new EPocalipse.IFilter.FilterReader(fn);
-                    string s = "";
-                    if (tf != null)
-                        s = tf.ReadToEnd();
+                    if (hoot.IsIndexed(fn) == false)
+                    {
+                        TextReader tf = new EPocalipse.IFilter.FilterReader(fn);
+                        string s = "";
+                        if (tf != null)
+                            s = tf.ReadToEnd();
 
-                    h.Index(new Document(fn, s), true);
+                        hoot.Index(new Document(fn, s), true);
+                    }
                 }
                 catch { }
                 i++;
                 if (i > 1000)
                 {
                     i = 0;
-                    h.Save();
+                    hoot.Save();
                 }
             }
-            h.Save();
-            //h.OptimizeIndex();
+            hoot.Save();
+            hoot.OptimizeIndex();
         }
 
         private void backgroundWorker1_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -168,7 +171,7 @@ namespace SampleApp
                 return;
             }
 
-            h = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index");
+            hoot = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index");
             button1.Enabled = false;
         }
     }
