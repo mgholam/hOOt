@@ -39,6 +39,7 @@
   <ItemGroup>
     <Compile Include="MGIndex\BitmapIndex.cs" />
     <Compile Include="Document.cs" />
+    <Compile Include="MGIndex\BoolIndex.cs" />
     <Compile Include="MGIndex\DataTypes.cs" />
     <Compile Include="fastJSON\Formatter.cs" />
     <Compile Include="fastJSON\Getters.cs" />

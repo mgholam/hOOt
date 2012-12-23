@@ -50,7 +50,7 @@ namespace SampleApp
             listBox1.Items.Clear();
             DateTime dt = DateTime.Now;
             listBox1.BeginUpdate();
-            
+
             foreach (var d in hoot.FindDocumentFileNames(txtSearch.Text))
             {
                 listBox1.Items.Add(d);
@@ -80,7 +80,7 @@ namespace SampleApp
             btnStart.Enabled = false;
             btnStop.Enabled = true;
             if (hoot == null)
-                hoot = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index");
+                hoot = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index", true);
 
             string[] files = Directory.GetFiles(txtWhere.Text, "*", SearchOption.AllDirectories);
             _indextime = DateTime.Now;
@@ -171,7 +171,7 @@ namespace SampleApp
                 return;
             }
 
-            hoot = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index");
+            hoot = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index", true);
             button1.Enabled = false;
         }
     }

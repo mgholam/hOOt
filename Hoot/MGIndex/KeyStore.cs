@@ -7,9 +7,9 @@ using System.IO;
 namespace hOOt
 {
     #region [   KeyStoreString   ]
-    internal class RaptorDBString : IDisposable
+    internal class KeyStoreString : IDisposable
     {
-        public RaptorDBString(string filename, bool caseSensitve)
+        public KeyStoreString(string filename, bool caseSensitve)
         {
             _db = KeyStore<int>.Open(filename, true);
             _caseSensitive = caseSensitve;
@@ -140,9 +140,9 @@ namespace hOOt
     #endregion
 
     #region [   KeyStoreGuid   ]
-    internal class RaptorDBGuid : IDisposable
+    internal class KeyStoreGuid : IDisposable
     {
-        public RaptorDBGuid(string filename)
+        public KeyStoreGuid(string filename)
         {
             _db = KeyStore<int>.Open(filename, true);
         }
@@ -283,10 +283,10 @@ namespace hOOt
             return val;
         }
 
-        //internal int CopyTo(StorageFile<int> backup, int start)
-        //{
-        //    return _db.CopyTo(backup, start);
-        //}
+        internal int CopyTo(StorageFile<int> backup, int start)
+        {
+            return _db.CopyTo(backup, start);
+        }
     }
     #endregion
 
@@ -311,7 +311,6 @@ namespace hOOt
         private MGIndex<T> _index;
         private string _datExtension = ".mgdat";
         private string _idxExtension = ".mgidx";
-        //private long _Count = -1;
         IGetBytes<T> _T = null;
         private System.Timers.Timer _savetimer;
         private BoolIndex _deleted;
@@ -334,7 +333,6 @@ namespace hOOt
                 return;
             lock (_savelock)
             {
-                //_archive.FlushData();
                 log.Debug("saving to disk");
                 _index.SaveIndex();
                 _deleted.SaveIndex();
@@ -351,24 +349,6 @@ namespace hOOt
         public byte[] FetchRecordBytes(int record)
         {
             return _archive.ReadData(record);
-        }
-
-        public string FetchRecordString(int record)
-        {
-            byte[] b = _archive.ReadData(record);
-
-            return Encoding.Unicode.GetString(b);
-        }
-
-        public IEnumerable<StorageData> EnumerateStorageFile()
-        {
-            return _archive.Enumerate();
-        }
-
-        public IEnumerable<KeyValuePair<T, int>> Enumerate(T fromkey)
-        {
-            // generate a list from the start key using forward only pages
-            return _index.Enumerate(fromkey);
         }
 
         public bool RemoveKey(T key)
@@ -494,7 +474,7 @@ namespace hOOt
             log.Debug("Starting save timer");
             _savetimer = new System.Timers.Timer();
             _savetimer.Elapsed += new System.Timers.ElapsedEventHandler(_savetimer_Elapsed);
-            _savetimer.Interval = Global.SaveTimerSeconds * 1000;
+            _savetimer.Interval = Global.SaveIndexToDiskTimerSeconds * 1000;
             _savetimer.AutoReset = true;
             _savetimer.Start();
 
@@ -553,9 +533,9 @@ namespace hOOt
             return _index.RemoveKey(id);
         }
 
-        //internal int CopyTo(StorageFile<int> storagefile, int start)
-        //{
-        //    return _archive.CopyTo(storagefile, start);            
-        //}
+        internal int CopyTo(StorageFile<int> storagefile, int start)
+        {
+            return _archive.CopyTo(storagefile, start);            
+        }
     }
 }

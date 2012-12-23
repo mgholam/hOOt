@@ -126,8 +126,8 @@ namespace hOOt
                 {
                     // new item 
                     ki = new KeyInfo(val);
-                    //if (_AllowDuplicates)
-                    //    SaveDuplicate(key, ref ki);
+                    if (_AllowDuplicates)
+                        SaveDuplicate(key, ref ki);
                     pi.UniqueCount++;
                     page.tree.Add(key, ki);
                 }
@@ -179,32 +179,11 @@ namespace hOOt
             _index.Shutdown();
         }
 
-        // FEATURE : bool includeDuplices, int start, int count)
-        public IEnumerable<KeyValuePair<T, int>> Enumerate(T fromkey)
+        public void FreeMemory()
         {
-            List<KeyValuePair<T, int>> list = new List<KeyValuePair<T, int>>();
-            // enumerate
-            PageInfo pi;
-            Page<T> page = LoadPage(fromkey, out pi);
-            T[] keys = page.tree.Keys();
-            Array.Sort<T>(keys);
-
-            int p = Array.BinarySearch<T>(keys, fromkey);
-            for (int i = p; i < keys.Length; i++)
-                list.Add(new KeyValuePair<T, int>(keys[i], page.tree[keys[i]].RecordNumber));
-
-            while (page.RightPageNumber != -1)
-            {
-                page = LoadPage(page.RightPageNumber);
-                keys = page.tree.Keys();
-                Array.Sort<T>(keys);
-
-                foreach (var k in keys)
-                    list.Add(new KeyValuePair<T, int>(k, page.tree[k].RecordNumber));
-            }
-
-            return list;
+            // TODO : implement when needed
         }
+
 
         public IEnumerable<int> GetDuplicates(T key)
         {
@@ -239,14 +218,14 @@ namespace hOOt
             return b;
         }
 
-        public Statistics GetStatistics()
-        {
-            Statistics s = new Statistics();
-            s.TotalSplitTime = _totalsplits;
-            s.PageCount = _pageList.Count;
+        //public Statistics GetStatistics()
+        //{
+        //    Statistics s = new Statistics();
+        //    s.TotalSplitTime = _totalsplits;
+        //    s.PageCount = _pageList.Count;
 
-            return s;
-        }
+        //    return s;
+        //}
 
         #region [  P R I V A T E  ]
         private double _totalsplits = 0;

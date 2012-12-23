@@ -10,7 +10,7 @@ namespace hOOt
 
         public static ushort PageItemCount = 10000;
 
-        public static int SaveTimerSeconds = 3000;
+        public static int SaveIndexToDiskTimerSeconds = 3000;
 
         public static byte DefaultStringKeySize = 60;
 

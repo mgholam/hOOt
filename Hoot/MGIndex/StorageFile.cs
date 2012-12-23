@@ -166,12 +166,12 @@ namespace hOOt
             _datawrite = null;
         }
 
-        //public static StorageFile<int> ReadForward(string filename)
-        //{
-        //    StorageFile<int> sf = new StorageFile<int>(filename, true);
+        public static StorageFile<int> ReadForward(string filename)
+        {
+            StorageFile<int> sf = new StorageFile<int>(filename, true);
 
-        //    return sf;
-        //}
+            return sf;
+        }
 
         #region [ private / internal  ]
 
@@ -308,26 +308,26 @@ namespace hOOt
             return (hdr[(int)HDR_POS.Flags] & (byte)1) > 0;
         }
 
-        //internal int CopyTo(StorageFile<int> storageFile, int start)
-        //{
-        //    // copy data here
-        //    lock (_lock)
-        //    {
-        //        long off = ComputeOffset(start);
-        //        _dataread.Seek(off, SeekOrigin.Begin);
-        //        Pump(_dataread, storageFile._datawrite);
+        internal int CopyTo(StorageFile<int> storageFile, int start)
+        {
+            // copy data here
+            lock (_lock)
+            {
+                long off = ComputeOffset(start);
+                _dataread.Seek(off, SeekOrigin.Begin);
+                Pump(_dataread, storageFile._datawrite);
 
-        //        return _lastRecordNum;
-        //    }
-        //}
+                return _lastRecordNum;
+            }
+        }
 
-        //private static void Pump(Stream input, Stream output)
-        //{
-        //    byte[] bytes = new byte[4096 * 2];
-        //    int n;
-        //    while ((n = input.Read(bytes, 0, bytes.Length)) != 0)
-        //        output.Write(bytes, 0, n);
-        //}
+        private static void Pump(Stream input, Stream output)
+        {
+            byte[] bytes = new byte[4096 * 2];
+            int n;
+            while ((n = input.Read(bytes, 0, bytes.Length)) != 0)
+                output.Write(bytes, 0, n);
+        }
 
         internal IEnumerable<StorageData> Enumerate()
         {
@@ -368,16 +368,5 @@ namespace hOOt
             }
         }
         #endregion
-
-        //internal void FlushData()
-        //{
-        //    lock (_lock)
-        //    {
-        //        _dataread.Flush();
-        //        _recfileread.Flush();
-        //        _recfilewrite.Flush();
-        //        _datawrite.Flush();
-        //    }
-        //}
     }
 }

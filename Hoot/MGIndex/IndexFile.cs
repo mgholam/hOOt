@@ -35,7 +35,6 @@ namespace hOOt
         ILog log = LogManager.GetLogger(typeof(IndexFile<T>));
         private BitmapIndex _bitmap;
         IGetBytes<T> _T = null;
-        //private bool _inMemory = false;
         private object _fileLock = new object();
 
         public IndexFile(string filename, byte maxKeySize, ushort pageNodeCount)
@@ -179,8 +178,6 @@ namespace hOOt
 
         public void Shutdown()
         {
-            //if (_inMemory == true)
-            //    return;
             log.Debug("Shutdown IndexFile");
             if (_file != null)
             {

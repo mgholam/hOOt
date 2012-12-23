@@ -11,10 +11,11 @@ namespace hOOt
 {
     public class Hoot
     {
-        public Hoot(string IndexPath, string FileName)
+        public Hoot(string IndexPath, string FileName, bool DocMode)
         {
             _Path = IndexPath;
             _FileName = FileName;
+            _docMode = DocMode;
             if (_Path.EndsWith(Path.DirectorySeparatorChar.ToString()) == false) _Path += Path.DirectorySeparatorChar;
             Directory.CreateDirectory(IndexPath);
             LogManager.Configure(_Path + "log.txt", 200, false);
@@ -22,9 +23,11 @@ namespace hOOt
             _log.Debug("Starting hOOt....");
             _log.Debug("Storage Folder = " + _Path);
 
-            _docs = new RaptorDBString(_Path + "files.docs", false);
+            if (DocMode)
+                _docs = new KeyStoreString(_Path + "files.docs", false);
             _bitmaps = new BitmapIndex(_Path, _FileName + ".mgbmp");
-            _lastDocNum = (int)_docs.Count();
+            if (DocMode)
+                _lastDocNum = (int)_docs.Count();
             // read words
             LoadWords();
             // read deleted
@@ -38,7 +41,8 @@ namespace hOOt
         private int _lastDocNum = 0;
         private string _FileName = "words";
         private string _Path = "";
-        private RaptorDBString _docs;
+        private KeyStoreString _docs;
+        private bool _docMode = false;
 
         public int WordCount
         {
@@ -50,14 +54,6 @@ namespace hOOt
             get { return _lastDocNum - (int)_deleted.GetBits().CountOnes(); }
         }
 
-        //public void FreeMemory(bool freecache)
-        //{
-        //    _log.Debug("freeing memory");
-        //    // free deleted
-        //    _deleted.FreeMemory();
-        //    _bitmaps.Commit(true);
-        //}
-
         public void Save()
         {
             InternalSave();
@@ -66,6 +62,11 @@ namespace hOOt
         public void Index(int recordnumber, string text)
         {
             AddtoIndex(recordnumber, text);
+        }
+
+        public WAHBitArray Query(string filter, int maxsize)
+        {
+            return ExecutionPlan(filter, maxsize);
         }
 
         public int Index(Document doc, bool deleteold)
@@ -95,14 +96,14 @@ namespace hOOt
 
         public IEnumerable<int> FindRows(string filter)
         {
-            WAHBitArray bits = ExecutionPlan(filter);
+            WAHBitArray bits = ExecutionPlan(filter, _docs.Count());
             // enumerate records
             return bits.GetBitIndexes();
         }
 
         public IEnumerable<Document> FindDocuments(string filter)
         {
-            WAHBitArray bits = ExecutionPlan(filter);
+            WAHBitArray bits = ExecutionPlan(filter, _docs.Count());
             // enumerate documents
             foreach (int i in bits.GetBitIndexes())
             {
@@ -117,7 +118,7 @@ namespace hOOt
 
         public IEnumerable<string> FindDocumentFileNames(string filter)
         {
-            WAHBitArray bits = ExecutionPlan(filter);
+            WAHBitArray bits = ExecutionPlan(filter, _docs.Count());
             // enumerate documents
             foreach (int i in bits.GetBitIndexes())
             {
@@ -163,12 +164,15 @@ namespace hOOt
 
         #region [  P R I V A T E   M E T H O D S  ]
 
-        private WAHBitArray ExecutionPlan(string filter)
+        private WAHBitArray ExecutionPlan(string filter, int maxsize)
         {
             _log.Debug("query : " + filter);
             DateTime dt = FastDateTime.Now;
             // query indexes
             string[] words = filter.Split(' ');
+            bool defaulttoand = true;
+            if (filter.IndexOfAny(new char[] { '+', '-' }, 0) > 0)
+                defaulttoand = false;
 
             WAHBitArray bits = null;
 
@@ -179,6 +183,8 @@ namespace hOOt
                 if (s == "") continue;
 
                 OPERATION op = OPERATION.OR;
+                if (defaulttoand)
+                    op = OPERATION.AND;
 
                 if (s.StartsWith("+"))
                 {
@@ -204,7 +210,7 @@ namespace hOOt
                             _words.TryGetValue(key, out c);
                             WAHBitArray ba = _bitmaps.GetBitmap(c);
 
-                            wildbits = DoBitOperation(wildbits, ba, OPERATION.OR);
+                            wildbits = DoBitOperation(wildbits, ba, OPERATION.OR, maxsize);
                         }
                     }
                     if (bits == null)
@@ -221,19 +227,23 @@ namespace hOOt
                 {
                     // bits logic
                     WAHBitArray ba = _bitmaps.GetBitmap(c);
-                    bits = DoBitOperation(bits, ba, op);
+                    bits = DoBitOperation(bits, ba, op, maxsize);
                 }
             }
             if (bits == null)
                 return new WAHBitArray();
 
             // remove deleted docs
-            WAHBitArray ret = bits.AndNot(_deleted.GetBits());
+            WAHBitArray ret ;
+            if (_docMode)
+                ret = bits.AndNot(_deleted.GetBits());
+            else
+                ret = bits;
             _log.Debug("query time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
             return ret;
         }
 
-        private static WAHBitArray DoBitOperation(WAHBitArray bits, WAHBitArray c, OPERATION op)
+        private static WAHBitArray DoBitOperation(WAHBitArray bits, WAHBitArray c, OPERATION op, int maxsize)
         {
             if (bits != null)
             {
@@ -246,7 +256,7 @@ namespace hOOt
                         bits = c.Or(bits);
                         break;
                     case OPERATION.ANDNOT:
-                        bits = c.AndNot(bits);
+                        bits = c.And(bits.Not(maxsize));
                         break;
                 }
             }
@@ -266,7 +276,8 @@ namespace hOOt
                 _deleted.SaveIndex();
 
                 // save docs 
-                _docs.SaveIndex();
+                if (_docMode)
+                    _docs.SaveIndex();
                 _bitmaps.Commit(false);
 
                 MemoryStream ms = new MemoryStream();
@@ -276,7 +287,7 @@ namespace hOOt
                 using (FileStream words = new FileStream(_Path + _FileName + ".words", FileMode.Create))
                 {
                     foreach (string key in _words.Keys())
-                    {                        
+                    {
                         bw.Write(key);
                         bw.Write(_words[key]);
                     }
@@ -313,13 +324,28 @@ namespace hOOt
 
         private void AddtoIndex(int recnum, string text)
         {
-            _log.Debug("text size = " + text.Length);
-            Dictionary<string, int> wordfreq = GenerateWordFreq(text);
-            _log.Debug("word count = " + wordfreq.Count);
-
-            foreach (string key in wordfreq.Keys)
+            if (text == "" || text == null)
+                return;
+            string[] keys;
+            if (_docMode)
             {
-                //Cache cache;
+                _log.Debug("text size = " + text.Length);
+                Dictionary<string, int> wordfreq = GenerateWordFreq(text);
+                _log.Debug("word count = " + wordfreq.Count);
+                var kk = wordfreq.Keys;
+                keys = new string[kk.Count];
+                kk.CopyTo(keys, 0);
+            }
+            else
+            {
+                keys = text.Split(' ');
+            }
+
+            foreach (string key in keys)
+            {
+                if (key == "")
+                    continue;
+
                 int bmp;
                 if (_words.TryGetValue(key, out bmp))
                 {
@@ -411,7 +437,7 @@ namespace hOOt
         private void AddDictionary(Dictionary<string, int> dic, string word)
         {
             int l = word.Length;
-            if (l > Global.DefaultStringKeySize)// MAX_STRING_LENGTH_IGNORE)
+            if (l > Global.DefaultStringKeySize)
                 return;
             if (l < 2)
                 return;
@@ -426,5 +452,12 @@ namespace hOOt
                 dic.Add(word, 1);
         }
         #endregion
+
+        public void Shutdown()
+        {
+            Save();
+            if (_docMode)
+                _docs.Shutdown();
+        }
     }
 }
