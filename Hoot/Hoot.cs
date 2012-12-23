@@ -96,14 +96,14 @@ namespace hOOt
 
         public IEnumerable<int> FindRows(string filter)
         {
-            WAHBitArray bits = ExecutionPlan(filter, _docs.Count());
+            WAHBitArray bits = ExecutionPlan(filter, _docs.RecordCount());
             // enumerate records
             return bits.GetBitIndexes();
         }
 
         public IEnumerable<Document> FindDocuments(string filter)
         {
-            WAHBitArray bits = ExecutionPlan(filter, _docs.Count());
+            WAHBitArray bits = ExecutionPlan(filter, _docs.RecordCount());
             // enumerate documents
             foreach (int i in bits.GetBitIndexes())
             {
@@ -118,7 +118,7 @@ namespace hOOt
 
         public IEnumerable<string> FindDocumentFileNames(string filter)
         {
-            WAHBitArray bits = ExecutionPlan(filter, _docs.Count());
+            WAHBitArray bits = ExecutionPlan(filter, _docs.RecordCount());
             // enumerate documents
             foreach (int i in bits.GetBitIndexes())
             {
@@ -456,6 +456,7 @@ namespace hOOt
         public void Shutdown()
         {
             Save();
+            _deleted.Shutdown();
             if (_docMode)
                 _docs.Shutdown();
         }

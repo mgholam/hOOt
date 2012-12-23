@@ -89,6 +89,11 @@ namespace hOOt
             return (int)_db.Count();
         }
 
+        public int RecordCount()
+        {
+            return (int)_db.RecordCount();
+        }
+
         public bool RemoveKey(string key)
         {
             byte[] bkey = Encoding.Unicode.GetBytes(key);
@@ -237,6 +242,11 @@ namespace hOOt
             return (int)_db.Count();
         }
 
+        public int RecordCount()
+        {
+            return (int)_db.RecordCount();
+        }
+
         private bool UnpackData(byte[] buffer, out byte[] val, out byte[] key)
         {
             int len = Helper.ToInt32(buffer, 0, false);
@@ -252,11 +262,6 @@ namespace hOOt
         {
             bool isdeleted = false;
             return Get(recnumber, out docid, out isdeleted);
-        }
-
-        internal int RecordCount()
-        {
-            return _db.RecordCount();
         }
 
         public bool RemoveKey(Guid key)
@@ -463,7 +468,7 @@ namespace hOOt
 
             _archive = new StorageFile<T>(db);
 
-            _deleted = new BoolIndex(_Path, "_deleted.idx");
+            _deleted = new BoolIndex(_Path, _FileName + "_deleted.idx");
 
             _archive.SkipDateTime = true;
 
@@ -535,7 +540,7 @@ namespace hOOt
 
         internal int CopyTo(StorageFile<int> storagefile, int start)
         {
-            return _archive.CopyTo(storagefile, start);            
+            return _archive.CopyTo(storagefile, start);
         }
     }
 }
