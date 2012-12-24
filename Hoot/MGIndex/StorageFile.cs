@@ -5,10 +5,11 @@ using System.Runtime.InteropServices;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
+using RaptorDB.Common;
 
-namespace hOOt
+namespace RaptorDB
 {
-    public class StorageData
+    internal class StorageData
     {
         public byte[] Key;
         public byte[] Data;
@@ -31,8 +32,8 @@ namespace hOOt
         IGetBytes<T> _T = null;
 
         public static byte[] _fileheader = { (byte)'M', (byte)'G', (byte)'D', (byte)'B',
-                                              0, // -- [flags] = [shutdownOK:1],
-                                              0  // -- [maxkeylen] 
+                                              0, // 4 -- not used,
+                                              0  // 5 -- not used
                                            };
 
         public static byte[] _rowheader = { (byte)'M', (byte)'G', (byte)'R' ,

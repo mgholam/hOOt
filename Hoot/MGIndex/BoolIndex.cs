@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
-using hOOt;
+using RaptorDB.Common;
 
-namespace hOOt
+namespace RaptorDB
 {
     internal class BoolIndex
     {

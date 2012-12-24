@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace hOOt
+namespace RaptorDB.Common
 {
     internal class SafeDictionary<TKey, TValue>
     {

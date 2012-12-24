@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.IO;
+using RaptorDB.Common;
 
-namespace hOOt
+namespace RaptorDB
 {
     #region [   KeyStoreString   ]
     internal class KeyStoreString : IDisposable

@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace hOOt
-{
     public class Global
     {
         public static int BitmapOffsetSwitchOverCount = 10;
@@ -18,4 +16,4 @@ namespace hOOt
 
         public static bool FreeBitmapMemoryOnSave = false;
     }
-}
+

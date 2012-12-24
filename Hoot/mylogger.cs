@@ -5,7 +5,7 @@ using System.Collections;
 using System.Threading;
 using System.IO;
 
-namespace hOOt
+namespace RaptorDB.Common
 {
     internal interface ILog
     {

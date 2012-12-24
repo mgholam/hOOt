@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace hOOt
+namespace RaptorDB
 {
     internal class MurmurHash2Unsafe
     {

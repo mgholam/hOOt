@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using RaptorDB.Common;
 
-namespace hOOt
+namespace RaptorDB
 {
     internal interface IGetBytes<T>
     {

@@ -42,5 +42,6 @@ v2.0
 - bug fix logger threading
 - restructured source code
 - fixed sample form tab order
-- 
+- added the ability for incremental indexing
+- storing document file information for future checking
 

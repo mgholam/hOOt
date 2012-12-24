@@ -119,7 +119,7 @@ namespace SampleApp
                         if (tf != null)
                             s = tf.ReadToEnd();
 
-                        hoot.Index(new Document(fn, s), true);
+                        hoot.Index(new Document(new FileInfo(fn), s), true);
                     }
                 }
                 catch { }

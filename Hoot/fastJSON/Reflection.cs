@@ -5,6 +5,7 @@ using System.Reflection.Emit;
 using System.Reflection;
 using System.Collections;
 using hOOt;
+using RaptorDB.Common;
 
 namespace fastJSON
 {

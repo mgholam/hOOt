@@ -4,11 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.IO;
+using RaptorDB.Common;
 
-namespace hOOt
+namespace RaptorDB
 {
     #region [ internal classes ]
-    internal struct PageInfo
+    internal struct PageInfo  // FEATURE : change back to class for count access for query caching
     {
         public PageInfo(int pagenum, int uniquecount, int duplicatecount)
         {
@@ -53,7 +54,7 @@ namespace hOOt
     }
 
 
-    public class Statistics
+    internal class Statistics
     {
         public int PageCount = 0;
         public double TotalSplitTime = 0;
