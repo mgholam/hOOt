@@ -308,6 +308,8 @@ namespace hOOt
                 return;
             // load words
             byte[] b = File.ReadAllBytes(_Path + _FileName + ".words");
+            if (b.Length == 0)
+                return;
             MemoryStream ms = new MemoryStream(b);
             BinaryReader br = new BinaryReader(ms, Encoding.UTF8);
             string s = br.ReadString();
@@ -364,7 +366,7 @@ namespace hOOt
 
         private Dictionary<string, int> GenerateWordFreq(string text)
         {
-            Dictionary<string, int> dic = new Dictionary<string, int>(50000);
+            Dictionary<string, int> dic = new Dictionary<string, int>(500);
 
             char[] chars = text.ToCharArray();
             int index = 0;
@@ -431,7 +433,7 @@ namespace hOOt
             }
             if (found == false)
             {
-                string s = new string(chars, start, end - start - 1).ToLowerInvariant().Trim();
+                string s = new string(chars, start, end - start).ToLowerInvariant().Trim();
                 AddDictionary(dic, s);
             }
         }
@@ -443,8 +445,8 @@ namespace hOOt
                 return;
             if (l < 2)
                 return;
-            if (char.IsLetter(word[l - 1]) == false)
-                word = new string(word.ToCharArray(), 0, l - 2);
+            if (char.IsLetterOrDigit(word[l - 1]) == false)
+                word = new string(word.ToCharArray(), 0, l - 1);
             if (word.Length < 2)
                 return;
             int cc = 0;

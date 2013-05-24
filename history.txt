@@ -45,3 +45,7 @@ v2.0
 - added the ability for incremental indexing
 - storing document file information for future checking
 
+v2.1
+----
+- upgrade to fastJSON v2.0.15
+- bug fix last word missing last character
