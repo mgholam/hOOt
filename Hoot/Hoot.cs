@@ -464,5 +464,14 @@ namespace hOOt
             if (_docMode)
                 _docs.Shutdown();
         }
+
+        public void FreeMemory()
+        {
+            if (_bitmaps != null)
+                _bitmaps.FreeMemory();
+            if (_docs != null)
+                _docs.FreeMemory();
+        }
+
     }
 }

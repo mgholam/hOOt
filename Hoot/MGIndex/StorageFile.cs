@@ -202,6 +202,28 @@ namespace RaptorDB
             }
         }
 
+        /// <summary>
+        /// internal use for guid keys only
+        /// </summary>
+        /// <param name="recnum"></param>
+        /// <param name="?"></param>
+        /// <param name="isdeleted"></param>
+        /// <returns></returns>
+        internal byte[] ReadData(int recnum, out Guid docid, out bool isdeleted)
+        {
+            isdeleted = false;
+            docid = Guid.Empty;
+            if (recnum >= _lastRecordNum)
+                return null;
+            lock (_lock)
+            {
+                long off = ComputeOffset(recnum);
+                byte[] key;
+                byte[] data= internalReadData(off, out key, out isdeleted);
+                docid = new Guid(key);
+                return data;
+            }
+        }
         private long ComputeOffset(int recnum)
         {
             if (_dirty)

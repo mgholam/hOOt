@@ -182,7 +182,20 @@ namespace RaptorDB
 
         public void FreeMemory()
         {
-            // TODO : implement when needed
+            _index.FreeMemory();
+            try
+            {
+                List<int> free = new List<int>();
+                foreach (var c in _cache)
+                {
+                    if (c.Value.isDirty == false)
+                        free.Add(c.Key);
+                }
+                _log.Debug("releasing page count = " + free.Count + " out of " + _cache.Count);
+                foreach (var i in free)
+                    _cache.Remove(i);
+            }
+            catch { }
         }
 
 

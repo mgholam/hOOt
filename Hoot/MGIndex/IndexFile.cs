@@ -176,6 +176,10 @@ namespace RaptorDB
             _file.Flush();
         }
 
+        public void FreeMemory()
+        {
+            _bitmap.FreeMemory();
+        }
         public void Shutdown()
         {
             log.Debug("Shutdown IndexFile");

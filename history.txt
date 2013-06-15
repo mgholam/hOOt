@@ -49,3 +49,9 @@ v2.1
 ----
 - upgrade to fastJSON v2.0.15
 - bug fix last word missing last character
+
+v2.2
+------
+- bug fix WAHBitArray
+- code sync with RaptorDB
+

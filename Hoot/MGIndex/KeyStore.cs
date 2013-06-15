@@ -141,6 +141,11 @@ namespace RaptorDB
             }
             return "";
         }
+
+        internal void FreeMemory()
+        {
+            _db.FreeMemory();
+        }
     }
     #endregion
 
@@ -525,6 +530,15 @@ namespace RaptorDB
             return _archive.Count();
         }
 
+        public int[] GetHistory(T key)
+        {
+            List<int> a = new List<int>();
+            foreach (int i in GetDuplicates(key))
+            {
+                a.Add(i);
+            }
+            return a.ToArray();
+        }
         internal byte[] FetchRecordBytes(int record, out bool isdeleted)
         {
             return _archive.ReadData(record, out isdeleted);
@@ -541,6 +555,23 @@ namespace RaptorDB
         internal int CopyTo(StorageFile<int> storagefile, int start)
         {
             return _archive.CopyTo(storagefile, start);
+        }
+
+        public byte[] GetRow(int rowid, out Guid docid, out bool isdeleted)
+        {
+            return _archive.ReadData(rowid, out docid, out isdeleted);
+        }
+
+        public bool GetRow(int rowid, out byte[] b)
+        {
+            bool isdel = false;
+            b = _archive.ReadData(rowid, out isdel);
+            return !isdel;
+        }
+
+        internal void FreeMemory()
+        {
+            _index.FreeMemory();
         }
     }
 }
