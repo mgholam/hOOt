@@ -51,7 +51,10 @@ v2.1
 - bug fix last word missing last character
 
 v2.2
-------
+----
 - bug fix WAHBitArray
 - code sync with RaptorDB
 
+v2.2.1
+------
+- bug fix WAHBitArray
