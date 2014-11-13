@@ -1,38 +1,16 @@
-v1.0
------
-- initial release
+v2.2.1
+------
+- bug fix WAHBitArray
 
-v1.1
+v2.2
 ----
-- tweaked parameters and reduced index size by 46%
-- speed increase bitmap index save 5x
-- bug fix sample ui 
-- bug fix bitarray resize
-- thread safe internals
-- code refactoring
-- OptimizeIndex() implemented
+- bug fix WAHBitArray
+- code sync with RaptorDB
 
-v1.2
+v2.1
 ----
-- FindDocumentFileNames() for faster string only return
-- Better word extractor ~19% smaller index
-	- breaks up camel case compound words
-    - ignores strings >60 chars and less than 2 chars
-
-v1.3
-----
-- Bug fix bitarray operations
-
-v1.4
-----
-- replaced WAHBitarray with v2
-- ~9x bitmap save speed increase
-- ** index must be rebuilt from previous version **
-
-v1.5
-----
-- added support for wildcard characters (*,?)
-- added support for AND (+) , NOT (-) queries
+- upgrade to fastJSON v2.0.15
+- bug fix last word missing last character
 
 v2.0
 ----
@@ -45,16 +23,38 @@ v2.0
 - added the ability for incremental indexing
 - storing document file information for future checking
 
-v2.1
+v1.5
 ----
-- upgrade to fastJSON v2.0.15
-- bug fix last word missing last character
+- added support for wildcard characters (*,?)
+- added support for AND (+) , NOT (-) queries
 
-v2.2
+v1.4
 ----
-- bug fix WAHBitArray
-- code sync with RaptorDB
+- replaced WAHBitarray with v2
+- ~9x bitmap save speed increase
+- ** index must be rebuilt from previous version **
 
-v2.2.1
-------
-- bug fix WAHBitArray
+v1.3
+----
+- Bug fix bitarray operations
+
+v1.2
+----
+- FindDocumentFileNames() for faster string only return
+- Better word extractor ~19% smaller index
+	- breaks up camel case compound words
+    - ignores strings >60 chars and less than 2 chars
+
+v1.1
+----
+- tweaked parameters and reduced index size by 46%
+- speed increase bitmap index save 5x
+- bug fix sample ui 
+- bug fix bitarray resize
+- thread safe internals
+- code refactoring
+- OptimizeIndex() implemented
+
+v1.0
+-----
+- initial release
