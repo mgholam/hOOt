@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Runtime.InteropServices;
 
 namespace EPocalipse.IFilter
 {
-  [ComVisible(false)]
+    [ComVisible(false)]
   [ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown), Guid("00000001-0000-0000-C000-000000000046")]
   internal interface IClassFactory
   {

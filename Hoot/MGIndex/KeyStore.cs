@@ -34,7 +34,7 @@ namespace RaptorDB
             ms.Write(bkey, 0, bkey.Length);
             ms.Write(val, 0, val.Length);
 
-            _db.Set(hc, ms.ToArray());
+            _db.SetBytes(hc, ms.ToArray());
         }
 
         public bool Get(string key, out string val)
@@ -56,7 +56,7 @@ namespace RaptorDB
             byte[] bkey = Encoding.Unicode.GetBytes(str);
             int hc = (int)Helper.MurMur.Hash(bkey);
 
-            if (_db.Get(hc, out val))
+            if (_db.GetBytes(hc, out val))
             {
                 // unpack data
                 byte[] g = null;
@@ -92,16 +92,6 @@ namespace RaptorDB
         public int RecordCount()
         {
             return (int)_db.RecordCount();
-        }
-
-        public bool RemoveKey(string key)
-        {
-            byte[] bkey = Encoding.Unicode.GetBytes(key);
-            int hc = (int)Helper.MurMur.Hash(bkey);
-            MemoryStream ms = new MemoryStream();
-            ms.Write(Helper.GetBytes(bkey.Length, false), 0, 4);
-            ms.Write(bkey, 0, bkey.Length);
-            return _db.Delete(hc, ms.ToArray());
         }
 
         public void SaveIndex()
@@ -149,158 +139,158 @@ namespace RaptorDB
     }
     #endregion
 
-    #region [   KeyStoreGuid   ]
-    internal class KeyStoreGuid : IDisposable
-    {
-        public KeyStoreGuid(string filename)
-        {
-            _db = KeyStore<int>.Open(filename, true);
-        }
+    #region [   KeyStoreGuid  removed ]
+    //internal class KeyStoreGuid : IDisposable //, IDocStorage
+    //{
+    //    public KeyStoreGuid(string filename)
+    //    {
+    //        _db = KeyStore<int>.Open(filename, true);
+    //    }
 
-        KeyStore<int> _db;
+    //    KeyStore<int> _db;
 
-        public void Set(Guid key, string val)
-        {
-            Set(key, Encoding.Unicode.GetBytes(val));
-        }
+    //    public void Set(Guid key, string val)
+    //    {
+    //        Set(key, Encoding.Unicode.GetBytes(val));
+    //    }
 
-        public int Set(Guid key, byte[] val)
-        {
-            byte[] bkey = key.ToByteArray();
-            int hc = (int)Helper.MurMur.Hash(bkey);
-            MemoryStream ms = new MemoryStream();
-            ms.Write(Helper.GetBytes(bkey.Length, false), 0, 4);
-            ms.Write(bkey, 0, bkey.Length);
-            ms.Write(val, 0, val.Length);
+    //    public int Set(Guid key, byte[] val)
+    //    {
+    //        byte[] bkey = key.ToByteArray();
+    //        int hc = (int)Helper.MurMur.Hash(bkey);
+    //        MemoryStream ms = new MemoryStream();
+    //        ms.Write(Helper.GetBytes(bkey.Length, false), 0, 4);
+    //        ms.Write(bkey, 0, bkey.Length);
+    //        ms.Write(val, 0, val.Length);
 
-            return _db.Set(hc, ms.ToArray());
-        }
+    //        return _db.SetBytes(hc, ms.ToArray());
+    //    }
 
-        public bool Get(Guid key, out string val)
-        {
-            val = null;
-            byte[] bval;
-            bool b = Get(key, out bval);
-            if (b)
-            {
-                val = Encoding.Unicode.GetString(bval);
-            }
-            return b;
-        }
+    //    public bool Get(Guid key, out string val)
+    //    {
+    //        val = null;
+    //        byte[] bval;
+    //        bool b = Get(key, out bval);
+    //        if (b)
+    //        {
+    //            val = Encoding.Unicode.GetString(bval);
+    //        }
+    //        return b;
+    //    }
 
-        public bool Get(Guid key, out byte[] val)
-        {
-            val = null;
-            byte[] bkey = key.ToByteArray();
-            int hc = (int)Helper.MurMur.Hash(bkey);
+    //    public bool Get(Guid key, out byte[] val)
+    //    {
+    //        val = null;
+    //        byte[] bkey = key.ToByteArray();
+    //        int hc = (int)Helper.MurMur.Hash(bkey);
 
-            if (_db.Get(hc, out val))
-            {
-                // unpack data
-                byte[] g = null;
-                if (UnpackData(val, out val, out g))
-                {
-                    if (Helper.CompareMemCmp(bkey, g) != 0)
-                    {
-                        // if data not equal check duplicates (hash conflict)
-                        List<int> ints = new List<int>(_db.GetDuplicates(hc));
-                        ints.Reverse();
-                        foreach (int i in ints)
-                        {
-                            byte[] bb = _db.FetchRecordBytes(i);
-                            if (UnpackData(bb, out val, out g))
-                            {
-                                if (Helper.CompareMemCmp(bkey, g) == 0)
-                                    return true;
-                            }
-                        }
-                        return false;
-                    }
-                    return true;
-                }
-            }
-            return false;
-        }
+    //        if (_db.Get(hc, out val))
+    //        {
+    //            // unpack data
+    //            byte[] g = null;
+    //            if (UnpackData(val, out val, out g))
+    //            {
+    //                if (Helper.CompareMemCmp(bkey, g) != 0)
+    //                {
+    //                    // if data not equal check duplicates (hash conflict)
+    //                    List<int> ints = new List<int>(_db.GetDuplicates(hc));
+    //                    ints.Reverse();
+    //                    foreach (int i in ints)
+    //                    {
+    //                        byte[] bb = _db.FetchRecordBytes(i);
+    //                        if (UnpackData(bb, out val, out g))
+    //                        {
+    //                            if (Helper.CompareMemCmp(bkey, g) == 0)
+    //                                return true;
+    //                        }
+    //                    }
+    //                    return false;
+    //                }
+    //                return true;
+    //            }
+    //        }
+    //        return false;
+    //    }
 
-        public void SaveIndex()
-        {
-            _db.SaveIndex();
-        }
+    //    public void SaveIndex()
+    //    {
+    //        _db.SaveIndex();
+    //    }
 
-        public void Shutdown()
-        {
-            _db.Shutdown();
-        }
+    //    public void Shutdown()
+    //    {
+    //        _db.Shutdown();
+    //    }
 
-        public void Dispose()
-        {
-            _db.Shutdown();
-        }
+    //    public void Dispose()
+    //    {
+    //        _db.Shutdown();
+    //    }
 
-        public byte[] FetchRecordBytes(int record)
-        {
-            return _db.FetchRecordBytes(record);
-        }
+    //    public byte[] FetchRecordBytes(int record)
+    //    {
+    //        return _db.FetchRecordBytes(record);
+    //    }
 
-        public int Count()
-        {
-            return (int)_db.Count();
-        }
+    //    public int Count()
+    //    {
+    //        return (int)_db.Count();
+    //    }
 
-        public int RecordCount()
-        {
-            return (int)_db.RecordCount();
-        }
+    //    public int RecordCount()
+    //    {
+    //        return (int)_db.RecordCount();
+    //    }
 
-        private bool UnpackData(byte[] buffer, out byte[] val, out byte[] key)
-        {
-            int len = Helper.ToInt32(buffer, 0, false);
-            key = new byte[len];
-            Buffer.BlockCopy(buffer, 4, key, 0, len);
-            val = new byte[buffer.Length - 4 - len];
-            Buffer.BlockCopy(buffer, 4 + len, val, 0, buffer.Length - 4 - len);
+    //    private bool UnpackData(byte[] buffer, out byte[] val, out byte[] key)
+    //    {
+    //        int len = Helper.ToInt32(buffer, 0, false);
+    //        key = new byte[len];
+    //        Buffer.BlockCopy(buffer, 4, key, 0, len);
+    //        val = new byte[buffer.Length - 4 - len];
+    //        Buffer.BlockCopy(buffer, 4 + len, val, 0, buffer.Length - 4 - len);
 
-            return true;
-        }
+    //        return true;
+    //    }
 
-        internal byte[] Get(int recnumber, out Guid docid)
-        {
-            bool isdeleted = false;
-            return Get(recnumber, out docid, out isdeleted);
-        }
+    //    internal byte[] Get(int recnumber, out Guid docid)
+    //    {
+    //        bool isdeleted = false;
+    //        return Get(recnumber, out docid, out isdeleted);
+    //    }
 
-        public bool RemoveKey(Guid key)
-        {
-            byte[] bkey = key.ToByteArray();
-            int hc = (int)Helper.MurMur.Hash(bkey);
-            MemoryStream ms = new MemoryStream();
-            ms.Write(Helper.GetBytes(bkey.Length, false), 0, 4);
-            ms.Write(bkey, 0, bkey.Length);
-            return _db.Delete(hc, ms.ToArray());
-        }
+    //    public bool RemoveKey(Guid key)
+    //    {
+    //        byte[] bkey = key.ToByteArray();
+    //        int hc = (int)Helper.MurMur.Hash(bkey);
+    //        MemoryStream ms = new MemoryStream();
+    //        ms.Write(Helper.GetBytes(bkey.Length, false), 0, 4);
+    //        ms.Write(bkey, 0, bkey.Length);
+    //        return _db.Delete(hc, ms.ToArray());
+    //    }
 
-        internal byte[] Get(int recnumber, out Guid docid, out bool isdeleted)
-        {
-            docid = Guid.Empty;
-            byte[] buffer = _db.FetchRecordBytes(recnumber, out isdeleted);
-            if (buffer == null) return null;
-            if (buffer.Length == 0) return null;
-            byte[] key;
-            byte[] val;
-            // unpack data
-            UnpackData(buffer, out val, out key);
-            docid = new Guid(key);
-            return val;
-        }
+    //    public byte[] Get(int recnumber, out Guid docid, out bool isdeleted)
+    //    {
+    //        docid = Guid.Empty;
+    //        byte[] buffer = _db.FetchRecordBytes(recnumber, out isdeleted);
+    //        if (buffer == null) return null;
+    //        if (buffer.Length == 0) return null;
+    //        byte[] key;
+    //        byte[] val;
+    //        // unpack data
+    //        UnpackData(buffer, out val, out key);
+    //        docid = new Guid(key);
+    //        return val;
+    //    }
 
-        internal int CopyTo(StorageFile<int> backup, int start)
-        {
-            return _db.CopyTo(backup, start);
-        }
-    }
+    //    internal int CopyTo(StorageFile<int> backup, int start)
+    //    {
+    //        return _db.CopyTo(backup, start);
+    //    }
+    //}
     #endregion
 
-    internal class KeyStore<T> : IDisposable where T : IComparable<T>
+    internal class KeyStore<T> : IDisposable, IDocStorage<T> where T : IComparable<T>
     {
         public KeyStore(string Filename, byte MaxKeySize, bool AllowDuplicateKeys)
         {
@@ -321,7 +311,7 @@ namespace RaptorDB
         private MGIndex<T> _index;
         private string _datExtension = ".mgdat";
         private string _idxExtension = ".mgidx";
-        IGetBytes<T> _T = null;
+        private IGetBytes<T> _T = null;
         private System.Timers.Timer _savetimer;
         private BoolIndex _deleted;
 
@@ -358,17 +348,7 @@ namespace RaptorDB
 
         public byte[] FetchRecordBytes(int record)
         {
-            return _archive.ReadData(record);
-        }
-
-        public bool RemoveKey(T key)
-        {
-            // remove and store key in storage file
-            byte[] bkey = _T.GetBytes(key);
-            MemoryStream ms = new MemoryStream();
-            ms.Write(Helper.GetBytes(bkey.Length, false), 0, 4);
-            ms.Write(bkey, 0, bkey.Length);
-            return Delete(key, ms.ToArray());
+            return _archive.ReadBytes(record);
         }
 
         public long Count()
@@ -381,36 +361,63 @@ namespace RaptorDB
         {
             byte[] b = null;
             val = "";
-            bool ret = Get(key, out b);
+            bool ret = GetBytes(key, out b);
             if (ret)
-                val = Encoding.Unicode.GetString(b);
+            {
+                if (b != null)
+                    val = Encoding.Unicode.GetString(b);
+                else
+                    val = "";
+            }
             return ret;
         }
 
-        public bool Get(T key, out byte[] val)
+        public bool GetObject(T key, out object val)
         {
             int off;
             val = null;
-            T k = key;
-            // search index
-            if (_index.Get(k, out off))
+            if (_index.Get(key, out off))
             {
-                val = _archive.ReadData(off);
+                val = _archive.ReadObject(off);
                 return true;
             }
             return false;
         }
 
-        public int Set(T key, string data)
+        public bool GetBytes(T key, out byte[] val)
         {
-            return Set(key, Encoding.Unicode.GetBytes(data));
+            int off;
+            val = null;
+            // search index
+            if (_index.Get(key, out off))
+            {
+                val = _archive.ReadBytes(off);
+                return true;
+            }
+            return false;
         }
 
-        public int Set(T key, byte[] data)
+        public int SetString(T key, string data)
+        {
+            return SetBytes(key, Encoding.Unicode.GetBytes(data));
+        }
+
+        public int SetObject(T key, object doc)
         {
             int recno = -1;
             // save to storage
-            recno = _archive.WriteData(key, data, false);
+            recno = (int) _archive.WriteObject(key, doc);
+            // save to index
+            _index.Set(key, recno);
+
+            return recno;
+        }
+
+        public int SetBytes(T key, byte[] data)
+        {
+            int recno = -1;
+            // save to storage
+            recno = (int)_archive.WriteData(key, data);
             // save to index
             _index.Set(key, recno);
 
@@ -426,6 +433,7 @@ namespace RaptorDB
                     log.Debug("Shutting down");
                 else
                     return;
+                _savetimer.Enabled = false;
                 SaveIndex();
                 SaveLastRecord();
 
@@ -438,8 +446,8 @@ namespace RaptorDB
                 _index = null;
                 _archive = null;
                 _deleted = null;
-                log.Debug("Shutting down log");
-                LogManager.Shutdown();
+                //log.Debug("Shutting down log");
+                //LogManager.Shutdown();
             }
         }
 
@@ -469,13 +477,14 @@ namespace RaptorDB
 
             //LogManager.Configure(_Path + Path.DirectorySeparatorChar + _FileName + ".txt", 500, false);
 
-            _index = new MGIndex<T>(_Path, _FileName + _idxExtension, _MaxKeySize, Global.PageItemCount, AllowDuplicateKeys);
+            _index = new MGIndex<T>(_Path, _FileName + _idxExtension, _MaxKeySize, /*Global.PageItemCount,*/ AllowDuplicateKeys);
 
-            _archive = new StorageFile<T>(db);
+            if (Global.SaveAsBinaryJSON)
+                _archive = new StorageFile<T>(db, SF_FORMAT.BSON, false);
+            else
+                _archive = new StorageFile<T>(db, SF_FORMAT.JSON, false);
 
-            _deleted = new BoolIndex(_Path, _FileName + "_deleted.idx");
-
-            _archive.SkipDateTime = true;
+            _deleted = new BoolIndex(_Path, _FileName , "_deleted.idx");
 
             log.Debug("Current Count = " + RecordCount().ToString("#,0"));
 
@@ -525,7 +534,7 @@ namespace RaptorDB
 
         #endregion
 
-        internal int RecordCount()
+        public int RecordCount()
         {
             return _archive.Count();
         }
@@ -539,39 +548,65 @@ namespace RaptorDB
             }
             return a.ToArray();
         }
+
         internal byte[] FetchRecordBytes(int record, out bool isdeleted)
         {
-            return _archive.ReadData(record, out isdeleted);
+            StorageItem<T> meta;
+            byte[] b = _archive.ReadBytes(record, out meta);
+            isdeleted = meta.isDeleted;
+            return b;
         }
 
-        internal bool Delete(T id, byte[] data)
+        internal bool Delete(T id)
         {
             // write a delete record
-            int rec = _archive.WriteData(id, data, true);
+            int rec = (int)_archive.Delete(id);
             _deleted.Set(true, rec);
             return _index.RemoveKey(id);
         }
 
-        internal int CopyTo(StorageFile<int> storagefile, int start)
+        internal bool DeleteReplicated(T id)
         {
-            return _archive.CopyTo(storagefile, start);
+            // write a delete record for replicated object
+            int rec = (int)_archive.DeleteReplicated(id);
+            _deleted.Set(true, rec);
+            return _index.RemoveKey(id);
         }
 
-        public byte[] GetRow(int rowid, out Guid docid, out bool isdeleted)
+        internal int CopyTo(StorageFile<T> storagefile, long startrecord)
         {
-            return _archive.ReadData(rowid, out docid, out isdeleted);
+            return _archive.CopyTo(storagefile, startrecord);
         }
 
-        public bool GetRow(int rowid, out byte[] b)
+        public byte[] GetBytes(int rowid, out StorageItem<T> meta)
         {
-            bool isdel = false;
-            b = _archive.ReadData(rowid, out isdel);
-            return !isdel;
+            return _archive.ReadBytes(rowid, out meta);
         }
 
         internal void FreeMemory()
         {
             _index.FreeMemory();
+        }
+
+        public object GetObject(int rowid, out StorageItem<T> meta)
+        {
+            return _archive.ReadObject(rowid, out meta);
+        }
+
+        public StorageItem<T> GetMeta(int rowid)
+        {
+            return _archive.ReadMeta(rowid);
+        }
+
+        internal int SetReplicationObject(T key, object doc)
+        {
+            int recno = -1;
+            // save to storage
+            recno = (int) _archive.WriteReplicationObject(key, doc);
+            // save to index
+            _index.Set(key, recno);
+
+            return recno;
         }
     }
 }

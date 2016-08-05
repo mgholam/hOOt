@@ -1,80 +1,67 @@
-﻿using System.Collections.Generic;
-using System.Text;
+﻿using System.Text;
 
 namespace fastJSON
 {
     internal static class Formatter
     {
-        public static string Indent = "    ";
+        public static string Indent = "   ";
 
         public static void AppendIndent(StringBuilder sb, int count)
         {
             for (; count > 0; --count) sb.Append(Indent);
         }
 
-        public static bool IsEscaped(StringBuilder sb, int index)
-        {
-            bool escaped = false;
-            while (index > 0 && sb[--index] == '\\') escaped = !escaped;
-            return escaped;
-        }
-
         public static string PrettyPrint(string input)
         {
-            var output = new StringBuilder(input.Length * 2);
-            char? quote = null;
+            var output = new StringBuilder();
             int depth = 0;
-
-            for (int i = 0; i < input.Length; ++i)
+            int len = input.Length;
+            char[] chars = input.ToCharArray();
+            for (int i = 0; i < len; ++i)
             {
-                char ch = input[i];
+                char ch = chars[i];
+
+                if (ch == '\"') // found string span
+                {
+                    bool str = true;
+                    while (str)
+                    {
+                        output.Append(ch);
+                        ch = chars[++i];
+                        if (ch == '\\')
+                        {
+                            output.Append(ch);
+                            ch = chars[++i];
+                        }
+                        else if (ch == '\"')
+                            str = false;
+                    }
+                }
 
                 switch (ch)
                 {
                     case '{':
                     case '[':
                         output.Append(ch);
-                        if (!quote.HasValue)
-                        {
-                            output.AppendLine();
-                            AppendIndent(output, ++depth);
-                        }
+                        output.AppendLine();
+                        AppendIndent(output, ++depth);
                         break;
                     case '}':
                     case ']':
-                        if (quote.HasValue)
-                            output.Append(ch);
-                        else
-                        {
-                            output.AppendLine();
-                            AppendIndent(output, --depth);
-                            output.Append(ch);
-                        }
-                        break;
-                    case '"':
-                    case '\'':
+                        output.AppendLine();
+                        AppendIndent(output, --depth);
                         output.Append(ch);
-                        if (quote.HasValue)
-                        {
-                            if (!IsEscaped(output, i))
-                                quote = null;
-                        }
-                        else quote = ch;
                         break;
                     case ',':
                         output.Append(ch);
-                        if (!quote.HasValue)
-                        {
-                            output.AppendLine();
-                            AppendIndent(output, depth);
-                        }
+                        output.AppendLine();
+                        AppendIndent(output, depth);
                         break;
                     case ':':
-                        if (quote.HasValue) output.Append(ch);
-                        else output.Append(" : ");
+                        output.Append(" : ");
                         break;
                     default:
-                        if (quote.HasValue || !char.IsWhiteSpace(ch))
+                        if (!char.IsWhiteSpace(ch))
                             output.Append(ch);
                         break;
                 }

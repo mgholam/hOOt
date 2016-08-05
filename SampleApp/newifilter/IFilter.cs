@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using System.Runtime.InteropServices;
 
 //Contains IFilter interface translation
@@ -7,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace EPocalipse.IFilter
 {
-  [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential)]
   public struct FULLPROPSPEC 
   {
     public Guid guidPropSet;

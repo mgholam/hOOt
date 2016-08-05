@@ -1,28 +1,80 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Reflection.Emit;
 using System.Reflection;
 using System.Collections;
-using RaptorDB.Common;
+using System.Text;
+#if !SILVERLIGHT
+using System.Data;
+#endif
+using System.Collections.Specialized;
 
 namespace fastJSON
 {
     internal struct Getters
     {
         public string Name;
+        public string lcName;
         public Reflection.GenericGetter Getter;
-        public Type propertyType;
+    }
+
+    internal enum myPropInfoType
+    {
+        Int,
+        Long,
+        String,
+        Bool,
+        DateTime,
+        Enum,
+        Guid,
+
+        Array,
+        ByteArray,
+        Dictionary,
+        StringKeyDictionary,
+        NameValue,
+        StringDictionary,
+#if !SILVERLIGHT
+        Hashtable,
+        DataSet,
+        DataTable,
+#endif
+        Custom,
+        Unknown,
+    }
+
+    internal struct myPropInfo
+    {
+        public Type pt;
+        public Type bt;
+        public Type changeType;
+        public Reflection.GenericSetter setter;
+        public Reflection.GenericGetter getter;
+        public Type[] GenericTypes;
+        public string Name;
+        public myPropInfoType Type;
+        public bool CanWrite;
+
+        public bool IsClass;
+        public bool IsValueType;
+        public bool IsGenericType;
+        public bool IsStruct;
     }
 
     internal sealed class Reflection
     {
-        public readonly static Reflection Instance = new Reflection();
+        // Sinlgeton pattern 4 from : http://csharpindepth.com/articles/general/singleton.aspx
+        private static readonly Reflection instance = new Reflection();
+        // Explicit static constructor to tell C# compiler
+        // not to mark type as beforefieldinit
+        static Reflection()
+        {
+        }
         private Reflection()
         {
         }
+        public static Reflection Instance { get { return instance; } }
 
-        public bool ShowReadOnlyProperties = false;
         internal delegate object GenericSetter(object target, object value);
         internal delegate object GenericGetter(object obj);
         private delegate object CreateObject();
@@ -30,9 +82,184 @@ namespace fastJSON
         private SafeDictionary<Type, string> _tyname = new SafeDictionary<Type, string>();
         private SafeDictionary<string, Type> _typecache = new SafeDictionary<string, Type>();
         private SafeDictionary<Type, CreateObject> _constrcache = new SafeDictionary<Type, CreateObject>();
-        private SafeDictionary<Type, List<Getters>> _getterscache = new SafeDictionary<Type, List<Getters>>();
+        private SafeDictionary<Type, Getters[]> _getterscache = new SafeDictionary<Type, Getters[]>();
+        private SafeDictionary<string, Dictionary<string, myPropInfo>> _propertycache = new SafeDictionary<string, Dictionary<string, myPropInfo>>();
+        private SafeDictionary<Type, Type[]> _genericTypes = new SafeDictionary<Type, Type[]>();
+        private SafeDictionary<Type, Type> _genericTypeDef = new SafeDictionary<Type, Type>();
+
+        #region bjson custom types
+        internal UnicodeEncoding unicode = new UnicodeEncoding();
+        internal UTF8Encoding utf8 = new UTF8Encoding();
+        #endregion
+
+        #region json custom types
+        // JSON custom
+        internal SafeDictionary<Type, Serialize> _customSerializer = new SafeDictionary<Type, Serialize>();
+        internal SafeDictionary<Type, Deserialize> _customDeserializer = new SafeDictionary<Type, Deserialize>();
+
+        internal object CreateCustom(string v, Type type)
+        {
+            Deserialize d;
+            _customDeserializer.TryGetValue(type, out d);
+            return d(v);
+        }
+
+        internal void RegisterCustomType(Type type, Serialize serializer, Deserialize deserializer)
+        {
+            if (type != null && serializer != null && deserializer != null)
+            {
+                _customSerializer.Add(type, serializer);
+                _customDeserializer.Add(type, deserializer);
+                // reset property cache
+                Instance.ResetPropertyCache();
+            }
+        }
+
+        internal bool IsTypeRegistered(Type t)
+        {
+            if (_customSerializer.Count == 0)
+                return false;
+            Serialize s;
+            return _customSerializer.TryGetValue(t, out s);
+        }
+        #endregion
+
+        public Type GetGenericTypeDefinition(Type t)
+        {
+            Type tt = null;
+            if (_genericTypeDef.TryGetValue(t, out tt))
+                return tt;
+            else
+            {
+                tt = t.GetGenericTypeDefinition();
+                _genericTypeDef.Add(t, tt);
+                return tt;
+            }
+        }
+
+        public Type[] GetGenericArguments(Type t)
+        {
+            Type[] tt = null;
+            if (_genericTypes.TryGetValue(t, out tt))
+                return tt;
+            else
+            {
+                tt = t.GetGenericArguments();
+                _genericTypes.Add(t, tt);
+                return tt;
+            }
+        }
+
+        public Dictionary<string, myPropInfo> Getproperties(Type type, string typename)
+        {
+            Dictionary<string, myPropInfo> sd = null;
+            if (_propertycache.TryGetValue(typename, out sd))
+            {
+                return sd;
+            }
+            else
+            {
+                sd = new Dictionary<string, myPropInfo>();
+                var bf = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static;
+                PropertyInfo[] pr = type.GetProperties(bf);
+                foreach (PropertyInfo p in pr)
+                {
+                    if (p.GetIndexParameters().Length > 0)// Property is an indexer
+                        continue;
+
+                    myPropInfo d = CreateMyProp(p.PropertyType, p.Name);
+                    d.setter = Reflection.CreateSetMethod(type, p);
+                    if (d.setter != null)
+                        d.CanWrite = true;
+                    d.getter = Reflection.CreateGetMethod(type, p);
+                    sd.Add(p.Name.ToLower(), d);
+                }
+                FieldInfo[] fi = type.GetFields(bf);
+                foreach (FieldInfo f in fi)
+                {
+                    myPropInfo d = CreateMyProp(f.FieldType, f.Name);
+                    if (f.IsLiteral == false)
+                    {
+                        d.setter = Reflection.CreateSetField(type, f);
+                        if (d.setter != null)
+                            d.CanWrite = true;
+                        d.getter = Reflection.CreateGetField(type, f);
+                        sd.Add(f.Name.ToLower(), d);
+                    }
+                }
+
+                _propertycache.Add(typename, sd);
+                return sd;
+            }
+        }
+
+        private myPropInfo CreateMyProp(Type t, string name)
+        {
+            myPropInfo d = new myPropInfo();
+            myPropInfoType d_type = myPropInfoType.Unknown;
+
+            if (t == typeof(int) || t == typeof(int?)) d_type = myPropInfoType.Int;
+            else if (t == typeof(long) || t == typeof(long?)) d_type = myPropInfoType.Long;
+            else if (t == typeof(string)) d_type = myPropInfoType.String;
+            else if (t == typeof(bool) || t == typeof(bool?)) d_type = myPropInfoType.Bool;
+            else if (t == typeof(DateTime) || t == typeof(DateTime?)) d_type = myPropInfoType.DateTime;
+            else if (t.IsEnum) d_type = myPropInfoType.Enum;
+            else if (t == typeof(Guid) || t == typeof(Guid?)) d_type = myPropInfoType.Guid;
+            else if (t == typeof(StringDictionary)) d_type = myPropInfoType.StringDictionary;
+            else if (t == typeof(NameValueCollection)) d_type = myPropInfoType.NameValue;
+            else if (t.IsArray)
+            {
+                d.bt = t.GetElementType();
+                if (t == typeof(byte[]))
+                    d_type = myPropInfoType.ByteArray;
+                else
+                    d_type = myPropInfoType.Array;
+            }
+            else if (t.Name.Contains("Dictionary"))
+            {
+                d.GenericTypes = Reflection.Instance.GetGenericArguments(t);
+                if (d.GenericTypes.Length > 0 && d.GenericTypes[0] == typeof(string))
+                    d_type = myPropInfoType.StringKeyDictionary;
+                else
+                    d_type = myPropInfoType.Dictionary;
+            }
+#if !SILVERLIGHT
+            else if (t == typeof(Hashtable)) d_type = myPropInfoType.Hashtable;
+            else if (t == typeof(DataSet)) d_type = myPropInfoType.DataSet;
+            else if (t == typeof(DataTable)) d_type = myPropInfoType.DataTable;
+#endif
+            else if (IsTypeRegistered(t))
+                d_type = myPropInfoType.Custom;
+
+            if (t.IsValueType && !t.IsPrimitive && !t.IsEnum && t != typeof(decimal))
+                d.IsStruct = true;
+
+            d.IsClass = t.IsClass;
+            d.IsValueType = t.IsValueType;
+            if (t.IsGenericType)
+            {
+                d.IsGenericType = true;
+                d.bt = t.GetGenericArguments()[0];
+            }
+
+            d.pt = t;
+            d.Name = name;
+            d.changeType = GetChangeType(t);
+            d.Type = d_type;
+
+            return d;
+        }
+
+        private Type GetChangeType(Type conversionType)
+        {
+            if (conversionType.IsGenericType && conversionType.GetGenericTypeDefinition().Equals(typeof(Nullable<>)))
+                return Reflection.Instance.GetGenericArguments(conversionType)[0];
+
+            return conversionType;
+        }
 
         #region [   PROPERTY GET SET   ]
+
         internal string GetTypeAssemblyName(Type t)
         {
             string val = "";
@@ -54,6 +281,12 @@ namespace fastJSON
             else
             {
                 Type t = Type.GetType(typename);
+                //if (t == null) // RaptorDB : loading runtime assemblies
+                //{
+                //    t = Type.GetType(typename, (name) => {
+                //        return AppDomain.CurrentDomain.GetAssemblies().Where(z => z.FullName == name.FullName).FirstOrDefault();
+                //    }, null, true);
+                //}
                 _typecache.Add(typename, t);
                 return t;
             }
@@ -97,7 +330,7 @@ namespace fastJSON
             }
             catch (Exception exc)
             {
-                throw new Exception(string.Format("Failed to fast create instance for type '{0}' from assemebly '{1}'",
+                throw new Exception(string.Format("Failed to fast create instance for type '{0}' from assembly '{1}'",
                     objtype.FullName, objtype.AssemblyQualifiedName), exc);
             }
         }
@@ -171,15 +404,28 @@ namespace fastJSON
             }
             else
             {
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Castclass, propertyInfo.DeclaringType);
-                il.Emit(OpCodes.Ldarg_1);
-                if (propertyInfo.PropertyType.IsClass)
-                    il.Emit(OpCodes.Castclass, propertyInfo.PropertyType);
+                if (!setMethod.IsStatic)
+                {
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Castclass, propertyInfo.DeclaringType);
+                    il.Emit(OpCodes.Ldarg_1);
+                    if (propertyInfo.PropertyType.IsClass)
+                        il.Emit(OpCodes.Castclass, propertyInfo.PropertyType);
+                    else
+                        il.Emit(OpCodes.Unbox_Any, propertyInfo.PropertyType);
+                    il.EmitCall(OpCodes.Callvirt, setMethod, null);
+                    il.Emit(OpCodes.Ldarg_0);
+                }
                 else
-                    il.Emit(OpCodes.Unbox_Any, propertyInfo.PropertyType);
-                il.EmitCall(OpCodes.Callvirt, setMethod, null);
-                il.Emit(OpCodes.Ldarg_0);
+                {
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Ldarg_1);
+                    if (propertyInfo.PropertyType.IsClass)
+                        il.Emit(OpCodes.Castclass, propertyInfo.PropertyType);
+                    else
+                        il.Emit(OpCodes.Unbox_Any, propertyInfo.PropertyType);
+                    il.Emit(OpCodes.Call, setMethod);
+                }
             }
 
             il.Emit(OpCodes.Ret);
@@ -240,9 +486,15 @@ namespace fastJSON
             }
             else
             {
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Castclass, propertyInfo.DeclaringType);
-                il.EmitCall(OpCodes.Callvirt, getMethod, null);
+                if (!getMethod.IsStatic)
+                {
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(OpCodes.Castclass, propertyInfo.DeclaringType);
+                    il.EmitCall(OpCodes.Callvirt, getMethod, null);
+                }
+                else
+                    il.Emit(OpCodes.Call, getMethod);
+
                 if (propertyInfo.PropertyType.IsValueType)
                     il.Emit(OpCodes.Box, propertyInfo.PropertyType);
             }
@@ -252,55 +504,107 @@ namespace fastJSON
             return (GenericGetter)getter.CreateDelegate(typeof(GenericGetter));
         }
 
-        internal List<Getters> GetGetters(Type type)
+        internal Getters[] GetGetters(Type type, bool ShowReadOnlyProperties, List<Type> IgnoreAttributes)
         {
-            List<Getters> val = null;
+            Getters[] val = null;
             if (_getterscache.TryGetValue(type, out val))
                 return val;
 
-            PropertyInfo[] props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            //bool isAnonymous = IsAnonymousType(type);
+
+            var bf = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static;
+            //if (ShowReadOnlyProperties)
+            //    bf |= BindingFlags.NonPublic;
+            PropertyInfo[] props = type.GetProperties(bf);
             List<Getters> getters = new List<Getters>();
             foreach (PropertyInfo p in props)
             {
-                if (!p.CanWrite && ShowReadOnlyProperties == false) continue;
-
-                object[] att = p.GetCustomAttributes(typeof(System.Xml.Serialization.XmlIgnoreAttribute), false);
-                if (att != null && att.Length > 0)
+                if (p.GetIndexParameters().Length > 0)
+                {// Property is an indexer
                     continue;
-
+                }
+                if (!p.CanWrite && (ShowReadOnlyProperties == false ))//|| isAnonymous == false))
+                    continue;
+                if (IgnoreAttributes != null)
+                {
+                    bool found = false;
+                    foreach (var ignoreAttr in IgnoreAttributes)
+                    {
+                        if (p.IsDefined(ignoreAttr, false))
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found)
+                        continue;
+                }
                 GenericGetter g = CreateGetMethod(type, p);
                 if (g != null)
-                {
-                    Getters gg = new Getters();
-                    gg.Name = p.Name;
-                    gg.Getter = g;
-                    gg.propertyType = p.PropertyType;
-                    getters.Add(gg);
-                }
+                    getters.Add(new Getters { Getter = g, Name = p.Name, lcName = p.Name.ToLower() });
             }
 
-            FieldInfo[] fi = type.GetFields(BindingFlags.Instance | BindingFlags.Public);
+            FieldInfo[] fi = type.GetFields(bf);
             foreach (var f in fi)
             {
-                object[] att = f.GetCustomAttributes(typeof(System.Xml.Serialization.XmlIgnoreAttribute), false);
-                if (att != null && att.Length > 0)
-                    continue;
-
-                GenericGetter g = CreateGetField(type, f);
-                if (g != null)
+                if (IgnoreAttributes != null)
                 {
-                    Getters gg = new Getters();
-                    gg.Name = f.Name;
-                    gg.Getter = g;
-                    gg.propertyType = f.FieldType;
-                    getters.Add(gg);
+                    bool found = false;
+                    foreach (var ignoreAttr in IgnoreAttributes)
+                    {
+                        if (f.IsDefined(ignoreAttr, false))
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found)
+                        continue;
+                }
+                if (f.IsLiteral == false)
+                {
+                    GenericGetter g = CreateGetField(type, f);
+                    if (g != null)
+                        getters.Add(new Getters { Getter = g, Name = f.Name, lcName = f.Name.ToLower() });
                 }
             }
-
-            _getterscache.Add(type, getters);
-            return getters;
+            val = getters.ToArray();
+            _getterscache.Add(type, val);
+            return val;
         }
 
+        //private static bool IsAnonymousType(Type type)
+        //{
+        //    // may break in the future if compiler defined names change...
+        //    const string CS_ANONYMOUS_PREFIX = "<>f__AnonymousType";
+        //    const string VB_ANONYMOUS_PREFIX = "VB$AnonymousType";
+
+        //    if (type == null)
+        //        throw new ArgumentNullException("type");
+
+        //    if (type.Name.StartsWith(CS_ANONYMOUS_PREFIX, StringComparison.Ordinal) || type.Name.StartsWith(VB_ANONYMOUS_PREFIX, StringComparison.Ordinal))
+        //    {
+        //        return type.IsDefined(typeof(CompilerGeneratedAttribute), false);
+        //    }
+
+        //    return false;
+        //}
         #endregion
+
+        internal void ResetPropertyCache()
+        {
+            _propertycache = new SafeDictionary<string, Dictionary<string, myPropInfo>>();
+        }
+
+        internal void ClearReflectionCache()
+        {
+            _tyname = new SafeDictionary<Type, string>();
+            _typecache = new SafeDictionary<string, Type>();
+            _constrcache = new SafeDictionary<Type, CreateObject>();
+            _getterscache = new SafeDictionary<Type, Getters[]>();
+            _propertycache = new SafeDictionary<string, Dictionary<string, myPropInfo>>();
+            _genericTypes = new SafeDictionary<Type, Type[]>();
+            _genericTypeDef = new SafeDictionary<Type, Type>();
+        }
     }
 }

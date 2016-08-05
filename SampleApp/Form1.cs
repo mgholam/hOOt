@@ -1,15 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
 using System.Windows.Forms;
 using System.IO;
-using hOOt;
-using System.Threading;
 using System.Diagnostics;
-
+using RaptorDB;
 
 namespace SampleApp
 {
@@ -27,12 +21,6 @@ namespace SampleApp
         {
             MessageBox.Show("Words = " + hoot.WordCount.ToString("#,#") + "\r\nDocuments = " + hoot.DocumentCount.ToString("#,#"));
         }
-
-        //private void button3_Click(object sender, EventArgs e)
-        //{
-        //    h.FreeMemory(false);
-        //    GC.Collect(2);
-        //}
 
         private void button4_Click(object sender, EventArgs e)
         {
@@ -119,7 +107,7 @@ namespace SampleApp
                         if (tf != null)
                             s = tf.ReadToEnd();
 
-                        hoot.Index(new Document(new FileInfo(fn), s), true);
+                        hoot.Index(new myDoc(new FileInfo(fn), s), true);
                     }
                 }
                 catch { }
@@ -173,6 +161,12 @@ namespace SampleApp
 
             hoot = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index", true);
             button1.Enabled = false;
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (hoot != null)
+                hoot.Shutdown();
         }
     }
 }

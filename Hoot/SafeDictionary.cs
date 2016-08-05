@@ -81,7 +81,7 @@ namespace RaptorDB.Common
         }
     }
 
-    internal class SafeSortedList<T, V>
+    public class SafeSortedList<T, V>
     {
         private object _padlock = new object();
         SortedList<T, V> _list = new SortedList<T, V>();
@@ -94,7 +94,10 @@ namespace RaptorDB.Common
         public void Add(T key, V val)
         {
             lock (_padlock)
-                _list.Add(key, val);
+                if (_list.ContainsKey(key) == false)
+                    _list.Add(key, val);
+                else
+                    _list[key] = val;
         }
 
         public void Remove(T key)
@@ -113,6 +116,41 @@ namespace RaptorDB.Common
         public V GetValue(int index)
         {
             lock (_padlock) return _list.Values[index];
+        }
+
+        public T[] Keys()
+        {
+            lock (_padlock)
+            {
+                T[] keys = new T[_list.Keys.Count];
+                _list.Keys.CopyTo(keys, 0);
+                return keys;
+            }
+        }
+
+        public IEnumerator<KeyValuePair<T, V>> GetEnumerator()
+        {
+            return ((ICollection<KeyValuePair<T, V>>)_list).GetEnumerator();
+        }
+
+        public bool TryGetValue(T key, out V value)
+        {
+            lock (_padlock)
+                return _list.TryGetValue(key, out value);
+        }
+
+        public V this[T key]
+        {
+            get
+            {
+                lock (_padlock)
+                    return _list[key];
+            }
+            set
+            {
+                lock (_padlock)
+                    _list[key] = value;
+            }
         }
     }
 

@@ -1,3 +1,15 @@
+v3.3.7
+------
+- synced code with RaptorDB v3.3.7
+- changed FindDocuments() to generic
+- fixed the ability to inherit from Document for your own properties
+- fixed registry read IFilter on 64bit
+- search fixes "microsoft -oracle +google -app*"
+- extracted tokenizer to own class with better word parsing
+- added build version with auto increment
+- diversified log messages
+- log level implementation
+
 v2.2.1
 ------
 - bug fix WAHBitArray

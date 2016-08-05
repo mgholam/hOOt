@@ -1,29 +1,61 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Collections;
 using System.Threading;
 using System.IO;
 
-namespace RaptorDB.Common
+namespace RaptorDB
 {
-    internal interface ILog
+    public interface ILog
     {
-        void Debug(object msg, params object[] objs);
-        void Error(object msg, params object[] objs);
-        void Info(object msg, params object[] objs);
-        void Warn(object msg, params object[] objs);
-        void Fatal(object msg, params object[] objs);
+        /// <summary>
+        /// Fatal log = log level 5
+        /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="objs"></param>
+        void Fatal(object msg, params object[] objs); // 5
+        /// <summary>
+        /// Error log = log level 4
+        /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="objs"></param>
+        void Error(object msg, params object[] objs); // 4
+        /// <summary>
+        /// Warning log = log level 3
+        /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="objs"></param>
+        void Warn(object msg, params object[] objs);  // 3
+        /// <summary>
+        /// Debug log = log level 2 
+        /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="objs"></param>
+        void Debug(object msg, params object[] objs); // 2
+        /// <summary>
+        /// Info log = log level 1
+        /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="objs"></param>
+        void Info(object msg, params object[] objs);  // 1
     }
 
     internal class FileLogger
     {
-        public static readonly FileLogger Instance = new FileLogger();
+        // Sinlgeton pattern 4 from : http://csharpindepth.com/articles/general/singleton.aspx
+        private static readonly FileLogger instance = new FileLogger();
+        // Explicit static constructor to tell C# compiler
+        // not to mark type as beforefieldinit
+        static FileLogger()
+        {
+        }
         private FileLogger()
         {
         }
+        public static FileLogger Instance { get { return instance; } }
 
-        private Queue _que = new Queue();
+        private Queue<string> _que = new Queue<string>();
+        private Queue<string> _log = new Queue<string>();
         private StreamWriter _output;
         private string _filename;
         private int _sizeLimit = 0;
@@ -31,7 +63,9 @@ namespace RaptorDB.Common
         private DateTime _lastFileDate;
         private bool _showMethodName = false;
         private string _FilePath = "";
-        System.Timers.Timer _saveTimer;
+        private System.Timers.Timer _saveTimer;
+        private int _lastLogsToKeep = 100;
+        internal int _logabove = 1;
 
         public bool ShowMethodNames
         {
@@ -40,7 +74,9 @@ namespace RaptorDB.Common
 
         public void Init(string filename, int sizelimitKB, bool showmethodnames)
         {
-            _que = new Queue();
+            if (_output != null)
+                return;
+            _que = new Queue<string>();
             _showMethodName = showmethodnames;
             _sizeLimit = sizelimitKB;
             _filename = filename;
@@ -70,6 +106,7 @@ namespace RaptorDB.Common
 
         public void ShutDown()
         {
+            _saveTimer.Enabled = false;
             WriteData();
             if (_output != null)
             {
@@ -79,7 +116,6 @@ namespace RaptorDB.Common
             }
         }
 
-        //object _writelock = new object();
         private void WriteData()
         {
             if (_output == null)
@@ -147,12 +183,17 @@ namespace RaptorDB.Common
                 if (_output != null)
                     _output.Flush();
             }
+            lock (_log)
+            {
+                while (_log.Count > _lastLogsToKeep)
+                    _log.Dequeue();
+            }
         }
 
         private string FormatLog(string log, string type, string meth, string msg, object[] objs)
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append(DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss"));
+            sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             sb.Append("|");
             sb.Append(log);
             sb.Append("|");
@@ -173,11 +214,30 @@ namespace RaptorDB.Common
 
         public void Log(string logtype, string type, string meth, string msg, params object[] objs)
         {
+            var l = FormatLog(logtype, type, meth, msg, objs);
             lock (_que)
-                _que.Enqueue(FormatLog(logtype, type, meth, msg, objs));
+                _que.Enqueue(l);
+            lock (_log)
+                _log.Enqueue(l);
+        }
+
+        internal List<string> GetLastLogs()
+        {
+            List<string> l = new List<string>();
+
+            foreach (var s in _log)
+            {
+                l.Add(s);
+            }
+
+            return l;
+        }
+
+        public void SetLogLevel(int abovelevel)
+        {
+            _logabove = abovelevel;
         }
     }
-
 
     internal class logger : ILog
     {
@@ -201,35 +261,38 @@ namespace RaptorDB.Common
         }
 
         #region ILog Members
-
-        public void Debug(object msg, params object[] objs)
-        {
-            log("DEBUG", "" + msg, objs);
-        }
-
-        public void Error(object msg, params object[] objs)
-        {
-            log("ERROR", "" + msg, objs);
-        }
-
-        public void Info(object msg, params object[] objs)
-        {
-            log("INFO", "" + msg, objs);
-        }
-
-        public void Warn(object msg, params object[] objs)
-        {
-            log("WARN", "" + msg, objs);
-        }
-
         public void Fatal(object msg, params object[] objs)
         {
             log("FATAL", "" + msg, objs);
         }
+
+        public void Error(object msg, params object[] objs)
+        {
+            if (FileLogger.Instance._logabove <= 4)
+                log("ERROR", "" + msg, objs);
+        }
+
+        public void Warn(object msg, params object[] objs)
+        {
+            if (FileLogger.Instance._logabove <= 3)
+                log("WARN", "" + msg, objs);
+        }
+
+        public void Debug(object msg, params object[] objs)
+        {
+            if (FileLogger.Instance._logabove <= 2)
+                log("DEBUG", "" + msg, objs);
+        }
+
+        public void Info(object msg, params object[] objs)
+        {
+            if (FileLogger.Instance._logabove <= 1)
+                log("INFO", "" + msg, objs);
+        }
         #endregion
     }
 
-    internal static class LogManager
+    public static class LogManager
     {
         public static ILog GetLogger(Type obj)
         {
@@ -241,9 +304,19 @@ namespace RaptorDB.Common
             FileLogger.Instance.Init(filename, sizelimitKB, showmethodnames);
         }
 
+        public static List<string> GetLastLogs()
+        {
+            return FileLogger.Instance.GetLastLogs();
+        }
+
         public static void Shutdown()
         {
             FileLogger.Instance.ShutDown();
+        }
+
+        public static void SetLogLevel(int abovelevel)
+        {
+            FileLogger.Instance.SetLogLevel(abovelevel);
         }
     }
 }
