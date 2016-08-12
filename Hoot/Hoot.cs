@@ -266,7 +266,7 @@ namespace RaptorDB
                     found = DoBitOperation(found, ba, op, maxsize);
                 }
                 else if (op == OPERATION.AND)
-                    found = null;
+                    found = new WAHBitArray();
             }
             if (found == null)
                 return new WAHBitArray();
