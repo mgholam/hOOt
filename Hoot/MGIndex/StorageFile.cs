@@ -248,7 +248,7 @@ namespace RaptorDB
                 data = fastBinaryJSON.BJSON.ToBJSON(obj);
             else
                 data = Helper.GetBytes(fastJSON.JSON.ToJSON(obj));
-            if(data.Length > (int)Global.CompressDocumentOverKiloBytes*_KILOBYTE)
+            if (data.Length > (int)Global.CompressDocumentOverKiloBytes * _KILOBYTE)
             {
                 meta.isCompressed = 1;
                 data = MiniLZO.Compress(data); //MiniLZO
@@ -401,7 +401,7 @@ namespace RaptorDB
                 {
                     if (data != null)
                         meta.dataLength = data.Length;
-                    byte[] metabytes = fastBinaryJSON.BJSON.ToBJSON(meta, new fastBinaryJSON.BJSONParameters { UseExtensions = false });
+                    byte[] metabytes = fastBinaryJSON.BJSON.ToBJSON(meta, new fastBinaryJSON.BJSONParameters { UseExtensions = false, UseTypedArrays = false });
 
                     // write header info
                     _datawrite.Write(new byte[] { 1 }, 0, 1); // FEATURE : add json here, write bson for now
@@ -609,7 +609,7 @@ namespace RaptorDB
                 }
 
                 // pump the current mgdat
-                lock(_readlock)
+                lock (_readlock)
                 {
                     _dataread.Seek(0L, SeekOrigin.Begin);
                     Pump(_dataread, storageFile._datawrite);

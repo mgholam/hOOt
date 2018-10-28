@@ -10,8 +10,17 @@ namespace RaptorDB
 {
     public class Hoot
     {
-        public Hoot(string IndexPath, string FileName, bool DocMode)
+        public Hoot(string IndexPath, string FileName, bool DocMode) : this(IndexPath, FileName, DocMode, new tokenizer())
         {
+
+        }
+
+        public Hoot(string IndexPath, string FileName, bool DocMode, ITokenizer tokenizer)
+        {
+            if (tokenizer != null)
+                _tokenizer = tokenizer;
+            else
+                _tokenizer = new tokenizer();
             _Path = IndexPath;
             _FileName = FileName;
             _docMode = DocMode;
@@ -32,7 +41,7 @@ namespace RaptorDB
             // read words
             LoadWords();
         }
-
+        private ITokenizer _tokenizer;
         private SafeDictionary<string, int> _words = new SafeDictionary<string, int>();
         //private SafeSortedList<string, int> _words = new SafeSortedList<string, int>();
         private BitmapIndex _bitmaps;
@@ -43,7 +52,9 @@ namespace RaptorDB
         private string _Path = "";
         private KeyStoreString _docs;
         private bool _docMode = false;
-        private bool _wordschanged = false;
+        private bool _wordschanged = true;
+        private bool _shutdowndone = false;
+        private object _lock = new object();
 
         public string[] Words
         {
@@ -52,7 +63,7 @@ namespace RaptorDB
 
         public int WordCount
         {
-            get { checkloaded(); return _words.Count; }
+            get { checkloaded(); return _words.Count(); }
         }
 
         public int DocumentCount
@@ -74,7 +85,7 @@ namespace RaptorDB
             AddtoIndex(recordnumber, text);
         }
 
-        public WAHBitArray Query(string filter, int maxsize)
+        public MGRB Query(string filter, int maxsize)
         {
             checkloaded();
             return ExecutionPlan(filter, maxsize);
@@ -94,7 +105,7 @@ namespace RaptorDB
 
             // save doc to disk
             string dstr = fastJSON.JSON.ToJSON(doc, new fastJSON.JSONParameters { UseExtensions = false });
-            _docs.Set(doc.FileName.ToLower(), Encoding.Unicode.GetBytes(dstr));
+            _docs.Set(doc.FileName.ToLower(), fastJSON.Reflection.UnicodeGetBytes(dstr));
 
             _log.Info("writing doc to disk (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
 
@@ -109,7 +120,7 @@ namespace RaptorDB
         public IEnumerable<int> FindRows(string filter)
         {
             checkloaded();
-            WAHBitArray bits = ExecutionPlan(filter, _docs.RecordCount());
+            MGRB bits = ExecutionPlan(filter, _docs.RecordCount());
             // enumerate records
             return bits.GetBitIndexes();
         }
@@ -117,7 +128,7 @@ namespace RaptorDB
         public IEnumerable<T> FindDocuments<T>(string filter)
         {
             checkloaded();
-            WAHBitArray bits = ExecutionPlan(filter, _docs.RecordCount());
+            MGRB bits = ExecutionPlan(filter, _docs.RecordCount());
             // enumerate documents
             foreach (int i in bits.GetBitIndexes())
             {
@@ -133,7 +144,7 @@ namespace RaptorDB
         public IEnumerable<string> FindDocumentFileNames(string filter)
         {
             checkloaded();
-            WAHBitArray bits = ExecutionPlan(filter, _docs.RecordCount());
+            MGRB bits = ExecutionPlan(filter, _docs.RecordCount());
             // enumerate documents
             foreach (int i in bits.GetBitIndexes())
             {
@@ -158,7 +169,7 @@ namespace RaptorDB
             byte[] b;
             if (_docs.Get(filename.ToLower(), out b))
             {
-                Document d = fastJSON.JSON.ToObject<Document>(Encoding.Unicode.GetString(b));
+                Document d = fastJSON.JSON.ToObject<Document>(fastJSON.Reflection.UnicodeGetString(b));
                 RemoveDocument(d.DocNumber);
                 return true;
             }
@@ -191,7 +202,7 @@ namespace RaptorDB
             }
         }
 
-        private WAHBitArray ExecutionPlan(string filter, int maxsize)
+        private MGRB ExecutionPlan(string filter, int maxsize)
         {
             //_log.Debug("query : " + filter);
             DateTime dt = FastDateTime.Now;
@@ -201,7 +212,7 @@ namespace RaptorDB
             //if (filter.IndexOfAny(new char[] { '+', '-' }, 0) > 0)
             //    defaulttoand = false;
 
-            WAHBitArray found = null;// WAHBitArray.Fill(maxsize);            
+            MGRB found = null;// MGRB.Fill(maxsize);            
 
             foreach (string s in words)
             {
@@ -227,13 +238,13 @@ namespace RaptorDB
                     not = true;
                     if (found == null) // leading with - -> "-oak hill"
                     {
-                        found = WAHBitArray.Fill(maxsize);
+                        found = MGRB.Fill(maxsize);
                     }
                 }
 
                 if (word.Contains("*") || word.Contains("?"))
                 {
-                    WAHBitArray wildbits = new WAHBitArray();
+                    MGRB wildbits = new MGRB();
 
                     // do wildcard search
                     Regex reg = new Regex("^" + word.Replace("*", ".*").Replace("?", ".") + "$", RegexOptions.IgnoreCase);
@@ -242,7 +253,7 @@ namespace RaptorDB
                         if (reg.IsMatch(key))
                         {
                             _words.TryGetValue(key, out c);
-                            WAHBitArray ba = _bitmaps.GetBitmap(c);
+                            MGRB ba = _bitmaps.GetBitmap(c);
 
                             wildbits = DoBitOperation(wildbits, ba, OPERATION.OR, maxsize);
                         }
@@ -262,17 +273,17 @@ namespace RaptorDB
                 else if (_words.TryGetValue(word.ToLowerInvariant(), out c))
                 {
                     // bits logic
-                    WAHBitArray ba = _bitmaps.GetBitmap(c);
+                    MGRB ba = _bitmaps.GetBitmap(c);
                     found = DoBitOperation(found, ba, op, maxsize);
                 }
                 else if (op == OPERATION.AND)
-                    found = new WAHBitArray();
+                    found = new MGRB();
             }
             if (found == null)
-                return new WAHBitArray();
+                return new MGRB();
 
             // remove deleted docs
-            WAHBitArray ret;
+            MGRB ret;
             if (_docMode)
                 ret = found.AndNot(_deleted.GetBits());
             else
@@ -281,7 +292,7 @@ namespace RaptorDB
             return ret;
         }
 
-        private static WAHBitArray DoBitOperation(WAHBitArray bits, WAHBitArray c, OPERATION op, int maxsize)
+        private static MGRB DoBitOperation(MGRB bits, MGRB c, OPERATION op, int maxsize)
         {
             if (bits != null)
             {
@@ -303,10 +314,9 @@ namespace RaptorDB
             return bits;
         }
 
-        private object _lock = new object();
         private void InternalSave()
         {
-            _log.Debug("saving index...");
+            _log.Info("saving index...");
             DateTime dt = FastDateTime.Now;
             // save deleted
             if (_deleted != null)
@@ -321,35 +331,21 @@ namespace RaptorDB
 
             if (_words != null && _wordschanged == true)
             {
-                MemoryStream ms = new MemoryStream();
-                BinaryWriter bw = new BinaryWriter(ms, Encoding.UTF8);
-
                 // save words and bitmaps
                 using (FileStream words = new FileStream(_Path + _FileName + ".words", FileMode.Create))
                 {
-                    var keys = _words.Keys();
-                    int c = keys.Length;
-                    _log.Debug("key count = " + c);
-                    foreach (string key in _words.Keys())
+                    using (BinaryWriter bw = new BinaryWriter(words, Encoding.UTF8))
                     {
-                        try//FIX : remove when bug found
+                        foreach (string key in _words.Keys())
                         {
                             bw.Write(key);
                             bw.Write(_words[key]);
                         }
-                        catch (Exception ex)
-                        {
-                            _log.Error(" on key = " + key);
-                            throw ex;
-                        }
                     }
-                    byte[] b = ms.ToArray();
-                    words.Write(b, 0, b.Length);
-                    words.Flush();
-                    words.Close();
                 }
+                _wordschanged = false;
             }
-            _log.Debug("save time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
+            _log.Info("save time (ms) = " + FastDateTime.Now.Subtract(dt).TotalMilliseconds);
         }
 
         private void LoadWords()
@@ -357,28 +353,29 @@ namespace RaptorDB
             lock (_lock)
             {
                 if (_words == null)
-                    _words = //new SafeSortedList<string, int>();
-                        new SafeDictionary<string, int>();
+                    _words = new SafeDictionary<string, int>();
+                             //  new SafeSortedList<string, int>();
                 if (File.Exists(_Path + _FileName + ".words") == false)
                     return;
                 // load words
-                byte[] b = File.ReadAllBytes(_Path + _FileName + ".words");
-                if (b.Length == 0)
-                    return;
-                MemoryStream ms = new MemoryStream(b);
-                BinaryReader br = new BinaryReader(ms, Encoding.UTF8);
-                string s = br.ReadString();
-                while (s != "")
+                using (FileStream words = new FileStream(_Path + _FileName + ".words", FileMode.Open))
                 {
-                    int off = br.ReadInt32();
-                    _words.Add(s, off);
-                    try
+                    using (BinaryReader br = new BinaryReader(words, Encoding.UTF8))
                     {
-                        s = br.ReadString();
+                        string s = br.ReadString();
+                        while (s != "")
+                        {
+                            int off = br.ReadInt32();
+                            _words.Add(s, off);
+                            try
+                            {
+                                s = br.ReadString();
+                            }
+                            catch { s = ""; }
+                        }
                     }
-                    catch { s = ""; }
                 }
-                _log.Debug("Word Count = " + _words.Count);
+                _log.Debug("Word Count = " + _words.Count());
                 _wordschanged = true;
             }
         }
@@ -392,7 +389,7 @@ namespace RaptorDB
             if (_docMode)
             {
                 //_log.Debug("text size = " + text.Length);
-                Dictionary<string, int> wordfreq = tokenizer.GenerateWordFreq(text);
+                Dictionary<string, int> wordfreq = _tokenizer.GenerateWordFreq(text);
                 //_log.Debug("word count = " + wordfreq.Count);
                 var kk = wordfreq.Keys;
                 keys = new string[kk.Count];
@@ -423,13 +420,16 @@ namespace RaptorDB
             _wordschanged = true;
         }
 
-
+        
         #endregion
 
         public void Shutdown()
         {
             lock (_lock)
             {
+                if (_shutdowndone == true)
+                    return;
+
                 InternalSave();
                 if (_deleted != null)
                 {
@@ -447,6 +447,8 @@ namespace RaptorDB
 
                 if (_docMode)
                     _docs.Shutdown();
+
+                _shutdowndone = true;
             }
         }
 
@@ -465,12 +467,12 @@ namespace RaptorDB
                 if (_docs != null)
                     _docs.FreeMemory();
 
-                //_words = null;// new SafeSortedList<string, int>();
+                _words = null;// new SafeSortedList<string, int>();
                 //_loaded = false;
             }
         }
 
-        internal T Fetch<T>(int docnum)
+        public T Fetch<T>(int docnum)
         {
             string b = _docs.ReadData(docnum);
             return fastJSON.JSON.ToObject<T>(b);

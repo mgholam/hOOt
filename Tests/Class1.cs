@@ -20,7 +20,7 @@ PascalCase property/    @test;pppp=1
 .aaaaa  ..bbbbb        com.ionic.framework  bob@gmail.com filename.docx filename.pdf
 ";
 
-            var d = RaptorDB.tokenizer.GenerateWordFreq(s);
+            var d = new RaptorDB.tokenizer().GenerateWordFreq(s);
         }
 
 

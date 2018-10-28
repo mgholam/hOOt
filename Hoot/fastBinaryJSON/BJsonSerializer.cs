@@ -1,22 +1,20 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-#if SILVERLIGHT
-
-#else
+#if !SILVERLIGHT
 using System.Data;
 #endif
 using System.IO;
-using fastJSON;
-using RaptorDB.Common;
 using System.Collections.Specialized;
+using fastJSON;
 
 namespace fastBinaryJSON
 {
     internal sealed class BJSONSerializer : IDisposable
     {
         private MemoryStream _output = new MemoryStream();
-        private MemoryStream _before = new MemoryStream();
+        //private MemoryStream _before = new MemoryStream();
+        private int _typespointer = 0;
         private int _MAX_DEPTH = 20;
         int _current_depth = 0;
         private Dictionary<string, int> _globalTypes = new Dictionary<string, int>();
@@ -29,7 +27,7 @@ namespace fastBinaryJSON
             {
                 // dispose managed resources
                 _output.Close();
-                _before.Close();
+                //_before.Close();
             }
             // free native resources
         }
@@ -53,13 +51,13 @@ namespace fastBinaryJSON
             // add $types
             if (_params.UsingGlobalTypes && _globalTypes != null && _globalTypes.Count > 0)
             {
-                byte[] after = _output.ToArray();
-                _output = _before;
+                var pointer = (int)_output.Length;
                 WriteName("$types");
                 WriteColon();
                 WriteTypes(_globalTypes);
-                WriteComma();
-                _output.Write(after, 0, after.Length);
+                //var i = _output.Length;
+                _output.Seek(_typespointer, SeekOrigin.Begin);
+                _output.Write(Helper.GetBytes(pointer, false), 0, 4);
 
                 return _output.ToArray();
             }
@@ -133,6 +131,9 @@ namespace fastBinaryJSON
 
             else if (obj is DateTime)
                 WriteDateTime((DateTime)obj);
+
+            else if (obj is TimeSpan)
+                WriteTimeSpan((TimeSpan)obj);
 #if NET4
             else if (obj is System.Dynamic.ExpandoObject)
                 WriteStringDictionary((IDictionary<string, object>)obj);
@@ -148,7 +149,7 @@ namespace fastBinaryJSON
                 WriteDataset((DataSet)obj);
 
             else if (obj is DataTable)
-                this.WriteDataTable((DataTable)obj);
+                WriteDataTable((DataTable)obj);
 #endif
             else if (obj is byte[])
                 WriteBytes((byte[])obj);
@@ -158,6 +159,9 @@ namespace fastBinaryJSON
 
             else if (obj is NameValueCollection)
                 WriteNV((NameValueCollection)obj);
+
+            else if (_params.UseTypedArrays && obj is Array)
+                WriteTypedArray((ICollection)obj);
 
             else if (obj is IEnumerable)
                 WriteArray((IEnumerable)obj);
@@ -170,6 +174,59 @@ namespace fastBinaryJSON
 
             else
                 WriteObject(obj);
+        }
+
+        private void WriteTimeSpan(TimeSpan obj)
+        {
+            _output.WriteByte(TOKENS.TIMESPAN);
+            byte[] b = Helper.GetBytes(obj.Ticks, false);
+            _output.Write(b, 0, b.Length);
+        }
+
+        private void WriteTypedArray(ICollection array)
+        {
+            bool pendingSeperator = false;
+            bool token = true;
+            var t = array.GetType();
+            if (t.IsGenericType == false)// != null) // non generic array
+            {
+                //if (t.GetElementType().IsClass)
+                {
+                    token = false;
+                    byte[] b;
+                    // array type name
+                    if (_params.v1_4TypedArray)
+                        b = Reflection.UTF8GetBytes(Reflection.Instance.GetTypeAssemblyName(t.GetElementType()));
+                    else
+                        b = Reflection.UnicodeGetBytes(Reflection.Instance.GetTypeAssemblyName(t.GetElementType()));
+                    if (b.Length < 256)
+                    {
+                        _output.WriteByte(TOKENS.ARRAY_TYPED);
+                        _output.WriteByte((byte)b.Length);
+                        _output.Write(b, 0, b.Length);
+                    }
+                    else
+                    {
+                        _output.WriteByte(TOKENS.ARRAY_TYPED_LONG);
+                        _output.Write(Helper.GetBytes(b.Length, false), 0, 2);
+                        _output.Write(b, 0, b.Length);
+                    }
+                    // array count
+                    _output.Write(Helper.GetBytes(array.Count, false), 0, 4); //count
+                }
+            }
+            if (token)
+                _output.WriteByte(TOKENS.ARRAY_START);
+
+            foreach (object obj in array)
+            {
+                if (pendingSeperator) WriteComma();
+
+                WriteValue(obj);
+
+                pendingSeperator = true;
+            }
+            _output.WriteByte(TOKENS.ARRAY_END);
         }
 
         private void WriteNV(NameValueCollection nameValueCollection)
@@ -293,7 +350,7 @@ namespace fastBinaryJSON
 
         private void WriteCustom(object obj)
         {
-            Serialize s;
+            Reflection.Serialize s;
             Reflection.Instance._customSerializer.TryGetValue(obj.GetType(), out s);
             WriteString(s(obj));
         }
@@ -473,14 +530,17 @@ namespace fastBinaryJSON
                 if (_TypesWritten == false)
                 {
                     _output.WriteByte(TOKENS.DOC_START);
-                    _before = _output;
-                    _output = new MemoryStream();
+                    // write pointer to $types position
+                    _output.WriteByte(TOKENS.TYPES_POINTER);
+                    _typespointer = (int)_output.Length; // place holder
+                    _output.Write(new byte[4], 0, 4); // zero pointer for now
+                                                      //_output = new MemoryStream();
+                    _TypesWritten = true;
                 }
                 else
                     _output.WriteByte(TOKENS.DOC_START);
 
             }
-            _TypesWritten = true;
             _current_depth++;
             if (_current_depth > _MAX_DEPTH)
                 throw new Exception("Serializer encountered maximum depth of " + _MAX_DEPTH);
@@ -513,7 +573,7 @@ namespace fastBinaryJSON
                 var o = p.Getter(obj);
                 if (_params.SerializeNulls == false && (o == null || o is DBNull))
                 {
-                    
+
                 }
                 else
                 {
@@ -529,7 +589,7 @@ namespace fastBinaryJSON
 
         private void WritePairFast(string name, string value)
         {
-            if ( _params.SerializeNulls == false && (value == null))
+            if (_params.SerializeNulls == false && (value == null))
                 return;
             WriteName(name);
 
@@ -622,8 +682,17 @@ namespace fastBinaryJSON
 
         private void WriteName(string s)
         {
-            _output.WriteByte(TOKENS.NAME);
-            byte[] b = Reflection.Instance.utf8.GetBytes(s);
+            byte[] b;
+            if (_params.UseUnicodeStrings == false)
+            {
+                _output.WriteByte(TOKENS.NAME);
+                b = Reflection.UTF8GetBytes(s);
+            }
+            else
+            {
+                _output.WriteByte(TOKENS.NAME_UNI);
+                b = Reflection.UnicodeGetBytes(s);
+            }
             _output.WriteByte((byte)b.Length);
             _output.Write(b, 0, b.Length % 256);
         }
@@ -634,12 +703,12 @@ namespace fastBinaryJSON
             if (_params.UseUnicodeStrings)
             {
                 _output.WriteByte(TOKENS.UNICODE_STRING);
-                b = Reflection.Instance.unicode.GetBytes(s);
+                b = Reflection.UnicodeGetBytes(s);
             }
             else
             {
                 _output.WriteByte(TOKENS.STRING);
-                b = Reflection.Instance.utf8.GetBytes(s);
+                b = Reflection.UTF8GetBytes(s);
             }
             _output.Write(Helper.GetBytes(b.Length, false), 0, 4);
             _output.Write(b, 0, b.Length);

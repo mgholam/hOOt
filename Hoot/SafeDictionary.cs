@@ -5,10 +5,25 @@ using System.Text;
 
 namespace RaptorDB.Common
 {
-    internal class SafeDictionary<TKey, TValue>
+    public interface IKV<T, V>
+    {
+        bool TryGetValue(T key, out V val);
+        int Count();
+        IEnumerator<KeyValuePair<T, V>> GetEnumerator();
+        void Add(T key, V value);
+        T[] Keys();
+        bool Remove(T key);
+        void Clear();
+        V GetValue(T key);
+        // safesortedlist only
+        //V GetValue(int index);
+        //T GetKey(int index);
+    }
+
+    public class SafeDictionary<TKey, TValue> : IKV<TKey, TValue>
     {
         private readonly object _Padlock = new object();
-        private readonly Dictionary<TKey, TValue> _Dictionary = null;
+        private readonly Dictionary<TKey, TValue> _Dictionary;
 
         public SafeDictionary(int capacity)
         {
@@ -40,14 +55,9 @@ namespace RaptorDB.Common
             }
         }
 
-        public int Count
+        public int Count()
         {
-            get { lock (_Padlock) return _Dictionary.Count; }
-        }
-
-        public ICollection<KeyValuePair<TKey, TValue>> GetList()
-        {
-            return (ICollection<KeyValuePair<TKey, TValue>>)_Dictionary;
+            lock (_Padlock) return _Dictionary.Count;
         }
 
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
@@ -61,6 +71,8 @@ namespace RaptorDB.Common
             {
                 if (_Dictionary.ContainsKey(key) == false)
                     _Dictionary.Add(key, value);
+                else
+                    _Dictionary[key] = value;
             }
         }
 
@@ -76,46 +88,72 @@ namespace RaptorDB.Common
 
         public bool Remove(TKey key)
         {
+            if (key == null)
+                return true;
             lock (_Padlock)
+            {
                 return _Dictionary.Remove(key);
+            }
+        }
+
+        public void Clear()
+        {
+            lock (_Padlock)
+                _Dictionary.Clear();
+        }
+
+        public TValue GetValue(TKey key)
+        {
+            lock (_Padlock)
+                return _Dictionary[key];
         }
     }
 
-    public class SafeSortedList<T, V>
+    public class SafeSortedList<T, V> : IKV<T, V>
     {
         private object _padlock = new object();
         SortedList<T, V> _list = new SortedList<T, V>();
 
-        public int Count
+        public int Count()
         {
-            get { lock (_padlock) return _list.Count; }
+            lock (_padlock) return _list.Count;
         }
 
         public void Add(T key, V val)
         {
             lock (_padlock)
+            {
                 if (_list.ContainsKey(key) == false)
                     _list.Add(key, val);
                 else
                     _list[key] = val;
+            }
         }
 
-        public void Remove(T key)
+        public bool Remove(T key)
         {
             if (key == null)
-                return;
+                return true;
             lock (_padlock)
-                _list.Remove(key);
+                return _list.Remove(key);
         }
 
         public T GetKey(int index)
         {
-            lock (_padlock) return _list.Keys[index];
+            lock (_padlock)
+                if (index < _list.Count)
+                    return _list.Keys[index];
+                else
+                    return default(T);
         }
 
         public V GetValue(int index)
         {
-            lock (_padlock) return _list.Values[index];
+            lock (_padlock)
+                if (index < _list.Count)
+                    return _list.Values[index];
+                else
+                    return default(V);
         }
 
         public T[] Keys()
@@ -126,17 +164,6 @@ namespace RaptorDB.Common
                 _list.Keys.CopyTo(keys, 0);
                 return keys;
             }
-        }
-
-        public IEnumerator<KeyValuePair<T, V>> GetEnumerator()
-        {
-            return ((ICollection<KeyValuePair<T, V>>)_list).GetEnumerator();
-        }
-
-        public bool TryGetValue(T key, out V value)
-        {
-            lock (_padlock)
-                return _list.TryGetValue(key, out value);
         }
 
         public V this[T key]
@@ -152,17 +179,40 @@ namespace RaptorDB.Common
                     _list[key] = value;
             }
         }
+
+        public IEnumerator<KeyValuePair<T, V>> GetEnumerator()
+        {
+            return ((ICollection<KeyValuePair<T, V>>)_list).GetEnumerator();
+        }
+
+        public bool TryGetValue(T key, out V value)
+        {
+            lock (_padlock)
+                return _list.TryGetValue(key, out value);
+        }
+
+        public void Clear()
+        {
+            lock (_padlock)
+                _list.Clear();
+        }
+
+        public V GetValue(T key)
+        {
+            lock (_padlock)
+                return _list[key];
+        }
     }
 
     //------------------------------------------------------------------------------------------------------------------
-
-    internal static class FastDateTime
+    public static class FastDateTime
     {
         public static TimeSpan LocalUtcOffset;
 
         public static DateTime Now
         {
-            get { return DateTime.UtcNow + LocalUtcOffset; }
+            get { return DateTime.SpecifyKind(DateTime.UtcNow + LocalUtcOffset, DateTimeKind.Local); }
+
         }
 
         static FastDateTime()
@@ -170,10 +220,9 @@ namespace RaptorDB.Common
             LocalUtcOffset = TimeZone.CurrentTimeZone.GetUtcOffset(DateTime.Now);
         }
     }
-
     //------------------------------------------------------------------------------------------------------------------
 
-    internal static class Helper
+    public static class Helper
     {
         public static MurmurHash2Unsafe MurMur = new MurmurHash2Unsafe();
         public static int CompareMemCmp(byte[] left, byte[] right)
@@ -187,7 +236,7 @@ namespace RaptorDB.Common
         [DllImport("msvcrt.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int memcmp(byte[] arr1, byte[] arr2, int cnt);
 
-        internal static unsafe int ToInt32(byte[] value, int startIndex, bool reverse)
+        public static int ToInt32(byte[] value, int startIndex, bool reverse)
         {
             if (reverse)
             {
@@ -200,7 +249,7 @@ namespace RaptorDB.Common
             return ToInt32(value, startIndex);
         }
 
-        internal static unsafe int ToInt32(byte[] value, int startIndex)
+        public static unsafe int ToInt32(byte[] value, int startIndex)
         {
             fixed (byte* numRef = &(value[startIndex]))
             {
@@ -208,7 +257,7 @@ namespace RaptorDB.Common
             }
         }
 
-        internal static unsafe long ToInt64(byte[] value, int startIndex, bool reverse)
+        public static long ToInt64(byte[] value, int startIndex, bool reverse)
         {
             if (reverse)
             {
@@ -220,7 +269,7 @@ namespace RaptorDB.Common
             return ToInt64(value, startIndex);
         }
 
-        internal static unsafe long ToInt64(byte[] value, int startIndex)
+        public static unsafe long ToInt64(byte[] value, int startIndex)
         {
             fixed (byte* numRef = &(value[startIndex]))
             {
@@ -228,7 +277,7 @@ namespace RaptorDB.Common
             }
         }
 
-        internal static unsafe short ToInt16(byte[] value, int startIndex, bool reverse)
+        public static short ToInt16(byte[] value, int startIndex, bool reverse)
         {
             if (reverse)
             {
@@ -240,7 +289,7 @@ namespace RaptorDB.Common
             return ToInt16(value, startIndex);
         }
 
-        internal static unsafe short ToInt16(byte[] value, int startIndex)
+        public static unsafe short ToInt16(byte[] value, int startIndex)
         {
             fixed (byte* numRef = &(value[startIndex]))
             {
@@ -248,7 +297,7 @@ namespace RaptorDB.Common
             }
         }
 
-        internal static unsafe byte[] GetBytes(long num, bool reverse)
+        public static unsafe byte[] GetBytes(long num, bool reverse)
         {
             byte[] buffer = new byte[8];
             fixed (byte* numRef = buffer)
@@ -286,12 +335,12 @@ namespace RaptorDB.Common
 
         public static byte[] GetBytes(string s)
         {
-            return Encoding.UTF8.GetBytes(s);
+            return Encoding.UTF8.GetBytes(s); // TODO : change to unicode ??
         }
 
-        internal static string GetString(byte[] buffer, int index, short keylength)
+        public static string GetString(byte[] buffer, int index, short length)
         {
-            return Encoding.UTF8.GetString(buffer, index, keylength);
+            return Encoding.UTF8.GetString(buffer, index, length); // TODO : change to unicode ??
         }
     }
 }

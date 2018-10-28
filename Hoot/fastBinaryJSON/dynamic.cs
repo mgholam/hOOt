@@ -1,11 +1,12 @@
-﻿#if net4
+﻿#if NET4
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Dynamic;
 
 namespace fastBinaryJSON
 {
-    internal class DynamicJson : DynamicObject
+    internal class DynamicJson : DynamicObject, IEnumerable
     {
         private IDictionary<string, object> _dictionary { get; set; }
         private List<object> _list { get; set; }
@@ -16,6 +17,8 @@ namespace fastBinaryJSON
 
             if (parse is IDictionary<string, object>)
                 _dictionary = (IDictionary<string, object>)parse;
+            else if (parse is typedarray)
+                _list = ((typedarray)parse).data;
             else
                 _list = (List<object>)parse;
         }
@@ -45,7 +48,7 @@ namespace fastBinaryJSON
         public override bool TryGetMember(GetMemberBinder binder, out object result)
         {
             if (_dictionary.TryGetValue(binder.Name, out result) == false)
-                if (_dictionary.TryGetValue(binder.Name.ToLower(), out result) == false)
+                if (_dictionary.TryGetValue(binder.Name.ToLowerInvariant(), out result) == false)
                     return false;// throw new Exception("property not found " + binder.Name);
 
             if (result is IDictionary<string, object>)
@@ -66,6 +69,14 @@ namespace fastBinaryJSON
             }
 
             return _dictionary.ContainsKey(binder.Name);
+        }
+
+        public IEnumerator GetEnumerator()
+        {
+            foreach (var o in _list)
+            {
+                yield return new DynamicJson(o as IDictionary<string, object>);
+            }
         }
     }
 }

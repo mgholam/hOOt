@@ -2,7 +2,7 @@
 
 namespace RaptorDB
 {
-    internal class MurmurHash2Unsafe
+    public class MurmurHash2Unsafe
     {
         public UInt32 Hash(Byte[] data)
         {

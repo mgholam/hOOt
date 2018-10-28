@@ -19,6 +19,8 @@ namespace SampleApp
 
         private void button2_Click(object sender, EventArgs e)
         {
+            if (hoot == null)
+                loadhoot();
             MessageBox.Show("Words = " + hoot.WordCount.ToString("#,#") + "\r\nDocuments = " + hoot.DocumentCount.ToString("#,#"));
         }
 
@@ -30,10 +32,7 @@ namespace SampleApp
         private void btnSearch_Click(object sender, EventArgs e)
         {
             if (hoot == null)
-            {
-                MessageBox.Show("hOOt not loaded");
-                return;
-            }
+                loadhoot();
 
             listBox1.Items.Clear();
             DateTime dt = DateTime.Now;
@@ -67,8 +66,7 @@ namespace SampleApp
 
             btnStart.Enabled = false;
             btnStop.Enabled = true;
-            if (hoot == null)
-                hoot = new Hoot(Path.GetFullPath(txtIndexFolder.Text), "index", true);
+            loadhoot();
 
             string[] files = Directory.GetFiles(txtWhere.Text, "*", SearchOption.AllDirectories);
             _indextime = DateTime.Now;
@@ -102,12 +100,14 @@ namespace SampleApp
                 {
                     if (hoot.IsIndexed(fn) == false)
                     {
-                        TextReader tf = new EPocalipse.IFilter.FilterReader(fn);
-                        string s = "";
-                        if (tf != null)
-                            s = tf.ReadToEnd();
+                        using (TextReader tf = new EPocalipse.IFilter.FilterReader(fn))
+                        {
+                            string s = "";
+                            if (tf != null)
+                                s = tf.ReadToEnd();
 
-                        hoot.Index(new myDoc(new FileInfo(fn), s), true);
+                            hoot.Index(new myDoc(new FileInfo(fn), s), true);
+                        }
                     }
                 }
                 catch { }
@@ -153,6 +153,11 @@ namespace SampleApp
 
         private void button1_Click_1(object sender, EventArgs e)
         {
+            loadhoot();
+        }
+
+        private void loadhoot()
+        {
             if (txtIndexFolder.Text == "")
             {
                 MessageBox.Show("Please supply the index storage folder.");
@@ -167,6 +172,13 @@ namespace SampleApp
         {
             if (hoot != null)
                 hoot.Shutdown();
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            // free memory
+            hoot.FreeMemory();
+            GC.Collect(GC.MaxGeneration);
         }
     }
 }

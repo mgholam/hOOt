@@ -18,7 +18,7 @@ namespace RaptorDB
             0,0,0,0          // 11 = last record number indexed 
             };
 
-        private byte[] _BlockHeader = new byte[] { 
+        private byte[] _BlockHeader = new byte[] {
             (byte)'P',(byte)'A',(byte)'G',(byte)'E',
             0,               // 4 = [Flag] = 0=page 1=page list   
             0,0,             // 5 = [item count] 
@@ -39,6 +39,8 @@ namespace RaptorDB
 
         private KeyStoreHF _strings;
         private bool _externalStrings = false;
+        //private List<int> _pagelistalllocblock = null;
+        private string _FileName = "";
 
         public IndexFile(string filename, byte maxKeySize)//, ushort pageNodeCount)
         {
@@ -47,14 +49,16 @@ namespace RaptorDB
             {
                 _externalStrings = true;
                 _maxKeySize = 4;// blocknum:int
-            } 
+            }
             else
                 _maxKeySize = maxKeySize;
 
             _PageNodeCount = Global.PageItemCount;// pageNodeCount;
             _rowSize = (_maxKeySize + 1 + 4 + 4);
 
+            _FileName = filename.Substring(0, filename.LastIndexOf('.'));
             string path = Path.GetDirectoryName(filename);
+
             Directory.CreateDirectory(path);
             if (File.Exists(filename))
             {
@@ -107,7 +111,7 @@ namespace RaptorDB
             return GetDuplicateBitmap(recno).GetBitIndexes();
         }
 
-        public WAHBitArray GetDuplicateBitmap(int recno)
+        public MGRB GetDuplicateBitmap(int recno)
         {
             return _bitmap.GetBitmap(recno);
         }
@@ -261,12 +265,29 @@ namespace RaptorDB
                         throw new Exception("Count > node size");
                     nextpage = Helper.ToInt32(b, 11);
                     int index = _BlockHeader.Length;
-
+                    object[] keys = null;
+                    // TODO : needed??
+                    //if (File.Exists(_FileName + ".pagelist"))
+                    //{
+                    //    var bn = File.ReadAllBytes(_FileName + ".pagelist");
+                    //    int blknum = Helper.ToInt32(bn, 0);
+                    //    byte[] bb = _strings.GetData(blknum, out _pagelistalllocblock);
+                    //    keys = (object[])BJSON.ToObject(bb);
+                    //}
                     for (int i = 0; i < count; i++)
                     {
                         int idx = index + _rowSize * i;
                         byte ks = b[idx];
-                        T key = _T.GetObject(b, idx + 1, ks);
+                        T key;
+                        if (_externalStrings == false)
+                            key = _T.GetObject(b, idx + 1, ks);
+                        else
+                        {
+                            if (keys == null)
+                                key = _T.GetObject(b, idx + 1, ks); // do old way until better way
+                            else
+                                key = (T)keys[i];
+                        }
                         int pagenum = Helper.ToInt32(b, idx + 1 + _maxKeySize);
                         // add counts
                         int unique = Helper.ToInt32(b, idx + 1 + _maxKeySize + 4);
@@ -291,7 +312,7 @@ namespace RaptorDB
 
                 SeekPage(pnum);
                 byte[] page = new byte[_PageLength];
-                byte[] blockheader = CreateBlockHeader(0, (ushort)node.tree.Count, node.RightPageNumber);
+                byte[] blockheader = CreateBlockHeader(0, (ushort)node.tree.Count(), node.RightPageNumber);
                 Buffer.BlockCopy(blockheader, 0, page, 0, blockheader.Length);
 
                 int index = blockheader.Length;
@@ -305,7 +326,8 @@ namespace RaptorDB
                     // free old blocks
                     if (node.allocblocks != null)
                         _strings.FreeBlocks(node.allocblocks);
-                    blocknum = _strings.SaveData(node.DiskPageNumber.ToString(), fastBinaryJSON.BJSON.ToBJSON(keys));
+                    blocknum = _strings.SaveData(node.DiskPageNumber.ToString(), fastBinaryJSON.BJSON.ToBJSON(keys,
+                        new fastBinaryJSON.BJSONParameters { UseUnicodeStrings = false, UseTypedArrays = false }));
                 }
                 // node children
                 foreach (var kp in keys)
@@ -376,7 +398,7 @@ namespace RaptorDB
                             if (keys == null)
                             {
                                 int blknum = Helper.ToInt32(b, idx + 1, false);
-                                byte[] bb = _strings.GetData(blknum, page.allocblocks);
+                                byte[] bb = _strings.GetData(blknum, out page.allocblocks);
                                 keys = (object[])fastBinaryJSON.BJSON.ToObject(bb);
                             }
                             key = (T)keys[i];
@@ -397,8 +419,19 @@ namespace RaptorDB
         {
             lock (_fileLock)
             {
+                T[] keys = _pages.Keys();
+                int blocknum = 0;
+                // TODO : needed??
+                //if (_externalStrings)
+                //{
+                //    if (_pagelistalllocblock != null)
+                //        _strings.FreeBlocks(_pagelistalllocblock);
+                //    blocknum = _strings.SaveData("pagelist", BJSON.ToBJSON(keys,
+                //        new BJSONParameters { UseUnicodeStrings = false, UseTypedArrays = false }));
+                //    File.WriteAllBytes(_FileName + ".pagelist", Helper.GetBytes(blocknum, false));
+                //}
                 // save page list
-                int c = (_pages.Count / Global.PageItemCount) + 1;
+                int c = (_pages.Count() / Global.PageItemCount) + 1;
                 // allocate pages needed 
                 while (c > diskpages.Count)
                     diskpages.Add(GetNewPageNumber());
@@ -411,33 +444,44 @@ namespace RaptorDB
                     Buffer.BlockCopy(block, 0, page, 0, block.Length);
 
                     for (int j = 0; j < Global.PageItemCount; j++)
-                        CreatePageListData(_pages, i * Global.PageItemCount, block.Length, j, page);
+                        CreatePageListData(_pages, i * Global.PageItemCount, block.Length, j, page, blocknum);
 
                     SeekPage(diskpages[i]);
                     _file.Write(page, 0, page.Length);
                 }
 
-                c = _pages.Count % Global.PageItemCount;
+                c = _pages.Count() % Global.PageItemCount;
                 byte[] lastblock = CreateBlockHeader(1, (ushort)c, -1);
                 Buffer.BlockCopy(lastblock, 0, page, 0, lastblock.Length);
-                int lastoffset = (_pages.Count / Global.PageItemCount) * Global.PageItemCount;
+                int lastoffset = (_pages.Count() / Global.PageItemCount) * Global.PageItemCount;
 
                 for (int j = 0; j < c; j++)
-                    CreatePageListData(_pages, lastoffset, lastblock.Length, j, page);
+                    CreatePageListData(_pages, lastoffset, lastblock.Length, j, page, blocknum);
 
                 SeekPage(diskpages[diskpages.Count - 1]);
                 _file.Write(page, 0, page.Length);
             }
         }
 
-        private void CreatePageListData(SafeSortedList<T, PageInfo> _pages, int offset, int index, int counter, byte[] page)
+        private void CreatePageListData(SafeSortedList<T, PageInfo> _pages, int offset, int rowindex, int counter, byte[] page, int blocknum)
         {
-            int idx = index + _rowSize * counter;
+            int idx = rowindex + _rowSize * counter;
             // key bytes
-            byte[] kk = _T.GetBytes(_pages.GetKey(counter + offset));
-            byte size = (byte)kk.Length;
-            if (size > _maxKeySize)
-                size = _maxKeySize;
+            byte[] kk;
+            byte size;
+            if (_externalStrings == false)
+            {
+                kk = _T.GetBytes(_pages.GetKey(counter + offset));
+                size = (byte)kk.Length;
+                if (size > _maxKeySize)
+                    size = _maxKeySize;
+            }
+            else
+            {
+                kk = new byte[4];
+                Buffer.BlockCopy(Helper.GetBytes(counter + offset, false), 0, kk, 0, 4);
+                size = 4;
+            }
             // key size = 1 byte
             page[idx] = size;
             Buffer.BlockCopy(kk, 0, page, idx + 1, page[idx]);

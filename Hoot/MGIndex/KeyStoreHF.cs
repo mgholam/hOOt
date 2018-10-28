@@ -7,7 +7,7 @@ using System.Linq;
 namespace RaptorDB
 {
     // high frequency key value store
-    internal class KeyStoreHF : IKeyStoreHF
+    public class KeyStoreHF : IKeyStoreHF
     {
         internal class AllocationBlock
         {
@@ -54,7 +54,7 @@ namespace RaptorDB
             }
             _datastore = new StorageFileHF(_Path + "data.mghf", Global.HighFrequencyKVDiskBlockSize);
             _keys = new MGIndex<string>(_Path, "keys.idx", 255, /*Global.PageItemCount,*/ false);
-            _datastore.Initialize();
+            //_datastore.Initialize();
             _BlockSize = _datastore.GetBlockSize();
         }
 
@@ -67,13 +67,16 @@ namespace RaptorDB
             if (_Path.EndsWith(_S) == false) _Path += _S;
 
             _datastore = new StorageFileHF(_Path + filename, Global.HighFrequencyKVDiskBlockSize);
-            _datastore.Initialize();
+            //_datastore.Initialize();
             _BlockSize = _datastore.GetBlockSize();
         }
 
         public int CountHF()
         {
-            return _keys.Count();
+            if (_keys != null)
+                return _keys.Count();
+            else
+                return 0;
         }
 
         public object GetObjectHF(string key)
@@ -197,7 +200,7 @@ namespace RaptorDB
                     //Directory.Delete(_Path + "old", true); // FEATURE : delete or keep?
                     _log.Debug("Re-opening storage file");
                     _datastore = new StorageFileHF(_Path + "data.mghf", Global.HighFrequencyKVDiskBlockSize);
-                    _keys = new MGIndex<string>(_Path, "keys.idx", 255, /*Global.PageItemCount,*/ false);
+                    _keys = new MGIndex<string>(_Path, "keys.idx", 255, false);
 
                     _BlockSize = _datastore.GetBlockSize();
                 }
@@ -211,7 +214,7 @@ namespace RaptorDB
         public string[] GetKeysHF()
         {
             lock (_lock)
-                return _keys.GetKeys().Cast<string>().ToArray(); // FEATURE : dirty !?
+                return _keys.GetKeys().Cast<string>().ToArray(); // FEATURE : ugly and dirty !?
         }
 
         public bool ContainsHF(string key)
@@ -223,19 +226,22 @@ namespace RaptorDB
             }
         }
 
-        internal void Shutdown()
+        public void Shutdown()
         {
             _datastore.Shutdown();
             if (_keys != null)
+            {
                 _keys.Shutdown();
 
-            if (File.Exists(_Path + _dirtyFilename))
-                File.Delete(_Path + _dirtyFilename);
+                if (File.Exists(_Path + _dirtyFilename))
+                    File.Delete(_Path + _dirtyFilename);
+            }
         }
 
         internal void FreeMemory()
         {
-            _keys.FreeMemory();
+            if (_keys != null)
+                _keys.FreeMemory();
         }
 
         #region [  private methods  ]
@@ -433,11 +439,11 @@ namespace RaptorDB
 
                 keys = new MGIndex<string>(_Path, "keys.idx", 255, /*Global.PageItemCount,*/ false);
 
-                WAHBitArray visited = new WAHBitArray();
+                MGRB visited = new MGRB();
 
                 int c = _datastore.NumberofBlocks();
 
-                for (int i = 0; i < c; i++) // go through blocks
+                for (int i = 1; i < c; i++) // go through blocks skip first
                 {
                     if (visited.Get(i))
                         continue;
@@ -458,6 +464,9 @@ namespace RaptorDB
                     int last = 0;
                     bool freelast = false;
                     AllocationBlock old = null;
+
+                    if (ab.key == null)
+                        continue;
 
                     if (keys.Get(ab.key, out last))
                     {
@@ -489,8 +498,8 @@ namespace RaptorDB
                     // new data ok
                     if (failed == false)
                     {
-                        keys.Set(ab.key, ab.blocknumber);// valid block found
-                        if (freelast)// free the old blocks
+                        keys.Set(ab.key, i);// valid block found
+                        if (freelast && old != null)// free the old blocks
                             _datastore.FreeBlocks(old.Blocks);
                     }
 
@@ -521,6 +530,8 @@ namespace RaptorDB
                 _datastore.FreeBlocks(list);
         }
 
+
+        // for .string files
         internal int SaveData(string key, byte[] data)
         {
             lock (_lock)
@@ -537,7 +548,8 @@ namespace RaptorDB
             }
         }
 
-        internal byte[] GetData(int blocknumber, List<int> usedblocks)
+        // for .string files
+        internal byte[] GetData(int blocknumber, out List<int> usedblocks)
         {
             lock (_lock)
             {

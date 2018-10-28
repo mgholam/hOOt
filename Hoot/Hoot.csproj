@@ -34,6 +34,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -42,10 +43,14 @@
     <Compile Include="fastBinaryJSON\BJsonParser.cs" />
     <Compile Include="fastBinaryJSON\BJsonSerializer.cs" />
     <Compile Include="fastBinaryJSON\dynamic.cs" />
+    <Compile Include="fastBinaryJSON\Helper.cs" />
     <Compile Include="fastJSON\dynamic.cs" />
+    <Compile Include="fastJSON\Helper.cs" />
     <Compile Include="fastJSON\SafeDictionary.cs" />
+    <Compile Include="ITokenizer.cs" />
     <Compile Include="MGIndex\BitmapIndex.cs" />
     <Compile Include="Document.cs" />
+    <Compile Include="MGIndex\Container.cs" />
     <Compile Include="MGIndex\DataTypes.cs" />
     <Compile Include="fastJSON\Formatter.cs" />
     <Compile Include="fastJSON\Getters.cs" />
@@ -61,6 +66,7 @@
     <Compile Include="MGIndex\KeyStore.cs" />
     <Compile Include="MGIndex\KeyStoreHF.cs" />
     <Compile Include="MGIndex\MGIndex.cs" />
+    <Compile Include="MGIndex\MGRB.cs" />
     <Compile Include="MGIndex\MiniLZO.cs" />
     <Compile Include="MGIndex\MurMurHash2.cs">
       <SubType>Code</SubType>
@@ -70,7 +76,6 @@
     <Compile Include="AssemblyInfo.cs" />
     <Compile Include="SafeDictionary.cs" />
     <Compile Include="MGIndex\StorageFile.cs" />
-    <Compile Include="MGIndex\WAHBitarray2.cs" />
     <Compile Include="tokenizer.cs" />
   </ItemGroup>
   <ItemGroup>

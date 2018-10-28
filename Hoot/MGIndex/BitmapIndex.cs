@@ -1,7 +1,7 @@
-﻿using System;
+﻿using RaptorDB.Common;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using RaptorDB.Common;
 using System.Threading;
 
 namespace RaptorDB
@@ -10,6 +10,11 @@ namespace RaptorDB
     {
         public BitmapIndex(string path, string filename)
         {
+            if (Global.UseLessMemoryStructures)
+                _cache = new SafeSortedList<int, MGRB>();
+            else
+                _cache = new SafeDictionary<int, MGRB>();
+
             _FileName = Path.GetFileNameWithoutExtension(filename);
             _Path = path;
             if (_Path.EndsWith(Path.DirectorySeparatorChar.ToString()) == false)
@@ -44,9 +49,8 @@ namespace RaptorDB
         private BufferedStream _recordFileWrite;
         private long _lastBitmapOffset = 0;
         private int _lastRecordNumber = 0;
-        //private SafeDictionary<int, WAHBitArray> _cache = new SafeDictionary<int, WAHBitArray>();
-        private SafeSortedList<int, WAHBitArray> _cache = new SafeSortedList<int, WAHBitArray>();
-        //private SafeDictionary<int, long> _offsetCache = new SafeDictionary<int, long>();
+        //private SafeDictionary<int, MGRB> _cache = new SafeDictionary<int, MGRB>();
+        private IKV<int, MGRB> _cache = null;// new SafeSortedList<int, MGRB>();
         private ILog log = LogManager.GetLogger(typeof(BitmapIndex));
         private bool _stopOperations = false;
         private bool _shutdownDone = false;
@@ -70,7 +74,7 @@ namespace RaptorDB
             {
                 int i = _lastRecordNumber++;
 
-                _cache.Add(i, new WAHBitArray());
+                _cache.Add(i, new MGRB());
                 return i;
             }
         }
@@ -81,25 +85,27 @@ namespace RaptorDB
                 return;
             using (new L(this))
             {
-                log.Debug("writing "+_FileName);
+                log.Debug("writing " + _FileName);
                 int[] keys = _cache.Keys();
                 Array.Sort(keys);
 
                 foreach (int k in keys)
                 {
-                    WAHBitArray bmp = null;
+                    MGRB bmp = null;
                     if (_cache.TryGetValue(k, out bmp) && bmp.isDirty)
                     {
+                        bmp.Optimize();
                         SaveBitmap(k, bmp);
-                        bmp.FreeMemory();
                         bmp.isDirty = false;
                     }
                 }
                 Flush();
                 if (freeMemory)
                 {
-                    _cache = //new SafeDictionary<int, WAHBitArray>();
-                        new SafeSortedList<int, WAHBitArray>();
+                    if (Global.UseLessMemoryStructures)
+                        _cache = new SafeSortedList<int, MGRB>();
+                    else
+                        _cache = new SafeDictionary<int, MGRB>();
                     log.Debug("  freeing cache");
                 }
                 _isDirty = false;
@@ -110,7 +116,7 @@ namespace RaptorDB
         {
             using (new L(this))
             {
-                WAHBitArray ba = null;
+                MGRB ba = null;
 
                 ba = internalGetBitmap(bitmaprecno); //GetBitmap(bitmaprecno);
 
@@ -119,7 +125,7 @@ namespace RaptorDB
             }
         }
 
-        public WAHBitArray GetBitmap(int recno)
+        public MGRB GetBitmap(int recno)
         {
             using (new L(this))
             {
@@ -153,7 +159,7 @@ namespace RaptorDB
                         {
                             long offset = ReadRecordOffset(i);
 
-                            byte[] b = ReadBMPData(offset);
+                            byte[] b = ReadBMPDataForOptimize(offset);
                             if (b == null)
                             {
                                 _stopOperations = false;
@@ -187,41 +193,24 @@ namespace RaptorDB
             try
             {
                 List<int> free = new List<int>();
-                foreach (var b in _cache)
+                foreach (var k in _cache.Keys())
                 {
-                    if (b.Value.isDirty == false)
-                        free.Add(b.Key);
+                    var val = _cache.GetValue(k);
+                    if (val.isDirty == false)
+                        free.Add(k);
                 }
-                log.Debug("releasing bmp count = " + free.Count + " out of " + _cache.Count);
+                log.Info("releasing bmp count = " + free.Count + " out of " + _cache.Count());
                 foreach (int i in free)
                     _cache.Remove(i);
             }
-            catch (Exception ex){
+            catch (Exception ex)
+            {
                 log.Error(ex);
             }
         }
         #endregion
 
-
         #region [  P R I V A T E  ]
-        private byte[] ReadBMPData(long offset)
-        {
-            _bitmapFileRead.Seek(offset, SeekOrigin.Begin);
-
-            byte[] b = new byte[8];
-
-            _bitmapFileRead.Read(b, 0, 8);
-            if (b[0] == (byte)'B' && b[1] == (byte)'M' && b[7] == 0)
-            {
-                int c = Helper.ToInt32(b, 2) * 4 + 8;
-                byte[] data = new byte[c];
-                _bitmapFileRead.Seek(offset, SeekOrigin.Begin);
-                _bitmapFileRead.Read(data, 0, c);
-                return data;
-            }
-            return null;
-        }
-
         private long ReadRecordOffset(int recnum)
         {
             byte[] b = new byte[8];
@@ -302,11 +291,11 @@ namespace RaptorDB
         }
 
         private object _readlock = new object();
-        private WAHBitArray internalGetBitmap(int recno)
+        private MGRB internalGetBitmap(int recno)
         {
             lock (_readlock)
             {
-                WAHBitArray ba = new WAHBitArray();
+                MGRB ba = new MGRB();
                 if (recno == -1)
                     return ba;
 
@@ -320,7 +309,7 @@ namespace RaptorDB
                     //if (_offsetCache.TryGetValue(recno, out offset) == false)
                     {
                         offset = ReadRecordOffset(recno);
-                       // _offsetCache.Add(recno, offset);
+                        // _offsetCache.Add(recno, offset);
                     }
                     ba = LoadBitmap(offset);
 
@@ -332,7 +321,7 @@ namespace RaptorDB
         }
 
         private object _writelock = new object();
-        private void SaveBitmap(int recno, WAHBitArray bmp)
+        private void SaveBitmap(int recno, MGRB bmp)
         {
             lock (_writelock)
             {
@@ -352,88 +341,97 @@ namespace RaptorDB
         }
 
         //-----------------------------------------------------------------
-        // BITMAP FILE FORMAT
-        //    0  'B','M'
-        //    2  uint count = 4 bytes
-        //    6  Bitmap type :
-        //                0 = int record list   
-        //                1 = uint bitmap
-        //                2 = rec# indexes
-        //    7  '0'
-        //    8  uint data
-        //-----------------------------------------------------------------
-        private long SaveBitmapToFile(WAHBitArray bmp)
+        //  new format 
+        //  0 : b 
+        //  1 : m
+        //  2 : type 0 = uncompressed, 1 = compressed
+        //  3 : data size (int)
+        //  8 : data bytes
+        private byte _hdrlen = 2 + 4 + 1;
+        private long SaveBitmapToFile(MGRB bmp)
         {
             long off = _lastBitmapOffset;
-            WAHBitArray.TYPE t;
-            uint[] bits = bmp.GetCompressed(out t);
+            var dat = bmp.Serialize();
+            var hdr = new byte[_hdrlen];
+            var b = fastBinaryJSON.BJSON.ToBJSON(dat, new fastBinaryJSON.BJSONParameters { UseExtensions = false });
+            hdr[0] = (byte)'b';
+            hdr[1] = (byte)'m';
+            hdr[2] = 0; // uncompressed
 
-            byte[] b = new byte[bits.Length * 4 + 8];
-            // write header data
-            b[0] = ((byte)'B');
-            b[1] = ((byte)'M');
-            Buffer.BlockCopy(Helper.GetBytes(bits.Length, false), 0, b, 2, 4);
-
-            b[6] = (byte)t;
-            b[7] = (byte)(0);
-
-            for (int i = 0; i < bits.Length; i++)
+            if (Global.CompressBitmapBytes)
             {
-                byte[] u = Helper.GetBytes((int)bits[i], false);
-                Buffer.BlockCopy(u, 0, b, i * 4 + 8, 4);
+                hdr[2] = 1;
+                b = MiniLZO.Compress(b);
             }
+
+            var s = Helper.GetBytes(b.Length, false);
+            Buffer.BlockCopy(s, 0, hdr, 3, 4);
+
+            _bitmapFileWrite.Write(hdr, 0, hdr.Length);
+            _lastBitmapOffset += hdr.Length;
+
             _bitmapFileWrite.Write(b, 0, b.Length);
             _lastBitmapOffset += b.Length;
+
             return off;
         }
 
-        private WAHBitArray LoadBitmap(long offset)
+        private byte[] ReadBMPDataForOptimize(long offset)
         {
-            WAHBitArray bc = new WAHBitArray();
+            // return data + header
+            _bitmapFileRead.Seek(offset, SeekOrigin.Begin);
+
+            byte[] hdr = new byte[_hdrlen];
+
+            _bitmapFileRead.Read(hdr, 0, _hdrlen);
+            if (hdr[0] == (byte)'b' && hdr[1] == (byte)'m')
+            {
+                int c = Helper.ToInt32(hdr, 3);
+                var data = new byte[c + _hdrlen];
+                Buffer.BlockCopy(hdr, 0, data, 0, _hdrlen);
+                _bitmapFileRead.Read(data, _hdrlen, c);
+                return data;
+            }
+            return null;
+        }
+
+        private MGRB LoadBitmap(long offset)
+        {
+            MGRB bc = new MGRB();
             if (offset == -1)
                 return bc;
-
-            List<uint> ar = new List<uint>();
-            WAHBitArray.TYPE type = WAHBitArray.TYPE.WAH;
             FileStream bmp = _bitmapFileRead;
+            bmp.Seek(offset, SeekOrigin.Begin);
+            var hdr = new byte[_hdrlen];
+            bmp.Read(hdr, 0, hdr.Length);
+            if (hdr[0] == (byte)'b' && hdr[1] == (byte)'m')
             {
-                bmp.Seek(offset, SeekOrigin.Begin);
-
-                byte[] b = new byte[8];
-
-                bmp.Read(b, 0, 8);
-                if (b[0] == (byte)'B' && b[1] == (byte)'M' && b[7] == 0)
-                {
-                    type = (WAHBitArray.TYPE)Enum.ToObject(typeof(WAHBitArray.TYPE), b[6]);
-                    int c = Helper.ToInt32(b, 2);
-                    byte[] buf = new byte[c * 4];
-                    bmp.Read(buf, 0, c * 4);
-                    for (int i = 0; i < c; i++)
-                    {
-                        ar.Add((uint)Helper.ToInt32(buf, i * 4));
-                    }
-                }
+                int c = Helper.ToInt32(hdr, 3);
+                var b = new byte[c];
+                bmp.Read(b, 0, c);
+                if (hdr[2] == 1)
+                    b = MiniLZO.Decompress(b);
+                bc.Deserialize(fastBinaryJSON.BJSON.ToObject<MGRBData>(b));
             }
-            bc = new WAHBitArray(type, ar.ToArray());
+            else
+                log.Error("bitmap not recognized");
 
             return bc;
         }
 
-        //#pragma warning disable 642
+#pragma warning disable 642
         private void CheckInternalOP()
         {
             if (_stopOperations)
                 lock (_oplock) { } // yes! this is good
             Interlocked.Increment(ref _workingCount);
         }
-        //#pragma warning restore 642
+#pragma warning restore 642
 
         private void Done()
         {
             Interlocked.Decrement(ref _workingCount);
         }
         #endregion
-
-
     }
 }

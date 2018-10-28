@@ -1,3 +1,7 @@
+v4.0.5*
+-------
+- synced code with RaptorDB v4.0.5
+
 v3.3.8
 ------
 - bug fix search terms
