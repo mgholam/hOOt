@@ -3,6 +3,8 @@ using System.IO;
 using System.Text;
 using System.Collections.Generic;
 using RaptorDB.Common;
+//using fastBinaryJSON;
+//using fastJSON;
 
 namespace RaptorDB
 {
@@ -47,7 +49,7 @@ namespace RaptorDB
         public FileStream file;
     }
 
-    internal class StorageFile<T>
+    public class StorageFile<T>
     {
         FileStream _datawrite;
         FileStream _recfilewrite;

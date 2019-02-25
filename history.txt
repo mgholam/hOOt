@@ -1,6 +1,13 @@
-v4.0.5*
+v4.0.7
+------
+- synced with RaptorDB v4.0.7
+- * breaking changes to index files, please delete and reindex *
+
+v4.0.5
 -------
 - synced code with RaptorDB v4.0.5
+- lower memory usage tweeaks
+- * breaking changes to index files, please delete and reindex *
 
 v3.3.8
 ------

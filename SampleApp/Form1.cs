@@ -1,9 +1,11 @@
-﻿using System;
+﻿using RaptorDB;
+using System;
 using System.ComponentModel;
-using System.Windows.Forms;
-using System.IO;
 using System.Diagnostics;
-using RaptorDB;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
 
 namespace SampleApp
 {
@@ -105,12 +107,13 @@ namespace SampleApp
                             string s = "";
                             if (tf != null)
                                 s = tf.ReadToEnd();
-
-                            hoot.Index(new myDoc(new FileInfo(fn), s), true);
+                            if (s != "")
+                                hoot.Index(new myDoc(new FileInfo(fn), s), true);
                         }
                     }
                 }
-                catch { }
+                catch {
+                }
                 i++;
                 if (i > 1000)
                 {
@@ -119,7 +122,7 @@ namespace SampleApp
                 }
             }
             hoot.Save();
-            hoot.OptimizeIndex();
+            //hoot.OptimizeIndex();
         }
 
         private void backgroundWorker1_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -176,9 +179,25 @@ namespace SampleApp
 
         private void button3_Click(object sender, EventArgs e)
         {
+            if (hoot == null)
+                loadhoot();
+            else
+                return;
             // free memory
             hoot.FreeMemory();
             GC.Collect(GC.MaxGeneration);
+        }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            if (hoot == null)
+                loadhoot();
+
+            var sb = new StringBuilder();
+            var w = hoot.Words.ToList();
+            w.Sort();
+            w.ForEach(x => sb.AppendLine(x));
+            File.WriteAllText("words.txt", sb.ToString(), Encoding.UTF8);
         }
     }
 }

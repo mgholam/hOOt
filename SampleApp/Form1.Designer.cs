@@ -38,6 +38,7 @@
             this.button7 = new System.Windows.Forms.Button();
             this.txtWhere = new System.Windows.Forms.TextBox();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
+            this.button5 = new System.Windows.Forms.Button();
             this.button1 = new System.Windows.Forms.Button();
             this.lblIndexer = new System.Windows.Forms.Label();
             this.btnStop = new System.Windows.Forms.Button();
@@ -56,7 +57,7 @@
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(263, 19);
+            this.button2.Location = new System.Drawing.Point(168, 19);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(91, 23);
             this.button2.TabIndex = 10;
@@ -66,7 +67,7 @@
             // 
             // button3
             // 
-            this.button3.Location = new System.Drawing.Point(457, 19);
+            this.button3.Location = new System.Drawing.Point(362, 19);
             this.button3.Name = "button3";
             this.button3.Size = new System.Drawing.Size(91, 23);
             this.button3.TabIndex = 12;
@@ -76,7 +77,7 @@
             // 
             // button4
             // 
-            this.button4.Location = new System.Drawing.Point(360, 19);
+            this.button4.Location = new System.Drawing.Point(265, 19);
             this.button4.Name = "button4";
             this.button4.Size = new System.Drawing.Size(91, 23);
             this.button4.TabIndex = 11;
@@ -149,6 +150,7 @@
             // 
             // groupBox3
             // 
+            this.groupBox3.Controls.Add(this.button5);
             this.groupBox3.Controls.Add(this.button1);
             this.groupBox3.Controls.Add(this.lblIndexer);
             this.groupBox3.Controls.Add(this.btnStop);
@@ -164,14 +166,25 @@
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "3. Start/Stop Indexer";
             // 
+            // button5
+            // 
+            this.button5.Location = new System.Drawing.Point(459, 19);
+            this.button5.Name = "button5";
+            this.button5.Size = new System.Drawing.Size(91, 23);
+            this.button5.TabIndex = 13;
+            this.button5.Text = "save words";
+            this.button5.UseVisualStyleBackColor = true;
+            this.button5.Click += new System.EventHandler(this.button5_Click);
+            // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(10, 19);
+            this.button1.Location = new System.Drawing.Point(56, 45);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(75, 23);
             this.button1.TabIndex = 7;
             this.button1.Text = "Load hOOt";
             this.button1.UseVisualStyleBackColor = true;
+            this.button1.Visible = false;
             this.button1.Click += new System.EventHandler(this.button1_Click_1);
             // 
             // lblIndexer
@@ -186,7 +199,7 @@
             // btnStop
             // 
             this.btnStop.Enabled = false;
-            this.btnStop.Location = new System.Drawing.Point(182, 19);
+            this.btnStop.Location = new System.Drawing.Point(87, 19);
             this.btnStop.Name = "btnStop";
             this.btnStop.Size = new System.Drawing.Size(75, 23);
             this.btnStop.TabIndex = 9;
@@ -196,7 +209,7 @@
             // 
             // btnStart
             // 
-            this.btnStart.Location = new System.Drawing.Point(101, 19);
+            this.btnStart.Location = new System.Drawing.Point(6, 19);
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(75, 23);
             this.btnStart.TabIndex = 8;
@@ -314,6 +327,7 @@
         private System.Windows.Forms.TextBox txtWhere;
         private System.ComponentModel.BackgroundWorker backgroundWorker1;
         private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.Button button5;
     }
 }
 
